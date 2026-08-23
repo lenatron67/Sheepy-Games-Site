@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sheepy Games — Coming Soon!</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(180deg, #bfe9ff 0%, #eaf7f0 55%, #d9f2c4 100%);
+    overflow: hidden;
+  }
+
+  .sky {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .cloud {
+    position: absolute;
+    background: white;
+    border-radius: 50px;
+    opacity: 0.85;
+    filter: blur(0.5px);
+  }
+  .cloud::before, .cloud::after {
+    content: "";
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+  }
+  .cloud1 { width: 120px; height: 40px; top: 10%; left: 8%; }
+  .cloud1::before { width: 60px; height: 60px; top: -30px; left: 15px; }
+  .cloud1::after { width: 45px; height: 45px; top: -20px; left: 60px; }
+
+  .cloud2 { width: 90px; height: 32px; top: 18%; right: 10%; }
+  .cloud2::before { width: 45px; height: 45px; top: -22px; left: 10px; }
+  .cloud2::after { width: 35px; height: 35px; top: -15px; left: 45px; }
+
+  .cloud3 { width: 100px; height: 36px; bottom: 30%; left: 4%; opacity: 0.7; }
+  .cloud3::before { width: 50px; height: 50px; top: -25px; left: 12px; }
+  .cloud3::after { width: 38px; height: 38px; top: -16px; left: 50px; }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    padding: 24px;
+  }
+
+  .sheep {
+    font-size: 6rem;
+    display: inline-block;
+    animation: bounce 2.2s ease-in-out infinite;
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50% { transform: translateY(-18px) rotate(2deg); }
+  }
+
+  h1 {
+    font-size: clamp(2rem, 8vw, 3.5rem);
+    color: #3a5a40;
+    margin: 10px 0 6px;
+    text-shadow: 2px 2px 0 rgba(255,255,255,0.6);
+  }
+
+  p.tagline {
+    font-size: clamp(1rem, 4vw, 1.3rem);
+    color: #4a4a4a;
+    margin: 0 0 24px;
+    font-weight: 500;
+  }
+
+  .badge {
+    display: inline-block;
+    background: #ffffffcc;
+    border: 2px dashed #7ea87a;
+    color: #3a5a40;
+    padding: 10px 22px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+  }
+
+  .grass {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 12%;
+    background: #a9d68f;
+    border-top: 4px solid #8fc274;
+  }
+
+  .grass::before {
+    content: "🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾";
+    position: absolute;
+    top: -18px;
+    left: 0;
+    width: 100%;
+    font-size: 20px;
+    letter-spacing: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  footer {
+    position: absolute;
+    bottom: 2%;
+    width: 100%;
+    text-align: center;
+    z-index: 3;
+    font-size: 0.85rem;
+    color: #3a5a40cc;
+  }
+</style>
+</head>
+<body>
+  <div class="sky">
+    <div class="cloud cloud1"></div>
+    <div class="cloud cloud2"></div>
+    <div class="cloud cloud3"></div>
+
+    <div class="content">
+      <div class="sheep">🐑</div>
+      <h1>Sheepy is coming soon!</h1>
+      <p class="tagline">A flock of fun games are on their way.</p>
+      <div class="badge">🐑 Stay woolly, come back soon 🐑</div>
+    </div>
+
+    <div class="grass"></div>
+    <footer>sheepygames.com</footer>
+  </div>
+</body>
+</html>
