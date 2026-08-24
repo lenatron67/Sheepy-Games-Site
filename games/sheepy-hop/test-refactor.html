@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sheepy Hop Refactor Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .loading { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>Sheepy Hop Refactor Test</h1>
+    <div id="status" class="loading">Testing modules...</div>
+    <div id="results"></div>
+    
+    <script>
+        const tests = [];
+        const results = [];
+        
+        function test(name, fn) {
+            tests.push({ name, fn });
+        }
+        
+        function runTests() {
+            const status = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            
+            let passed = 0;
+            let failed = 0;
+            
+            tests.forEach((test, i) => {
+                try {
+                    test.fn();
+                    results.push(`✓ ${test.name}`);
+                    passed++;
+                } catch (error) {
+                    results.push(`✗ ${test.name}: ${error.message}`);
+                    failed++;
+                }
+            });
+            
+            status.className = failed === 0 ? 'success' : 'error';
+            status.innerHTML = failed === 0 
+                ? `All tests passed! (${passed}/${tests.length})`
+                : `${failed} test(s) failed (${passed}/${tests.length} passed)`;
+            
+            resultsDiv.innerHTML = '<h3>Test Results:</h3><pre>' + results.join('\n') + '</pre>';
+        }
+        
+        // Test 1: Check if Three.js is loaded
+        test('Three.js library', () => {
+            if (typeof THREE === 'undefined') {
+                throw new Error('THREE is not defined');
+            }
+        });
+        
+        // Test 2: Check if our modules are defined
+        test('CONSTANTS module', () => {
+            if (typeof CONSTANTS === 'undefined') {
+                throw new Error('CONSTANTS is not defined');
+            }
+        });
+        
+        test('LEVELS module', () => {
+            if (typeof LEVELS === 'undefined') {
+                throw new Error('LEVELS is not defined');
+            }
+        });
+        
+        test('TextureGenerator module', () => {
+            if (typeof TextureGenerator === 'undefined') {
+                throw new Error('TextureGenerator is not defined');
+            }
+        });
+        
+        test('ModelCreator module', () => {
+            if (typeof ModelCreator === 'undefined') {
+                throw new Error('ModelCreator is not defined');
+            }
+        });
+        
+        test('ParticleSystem module', () => {
+            if (typeof ParticleSystem === 'undefined') {
+                throw new Error('ParticleSystem is not defined');
+            }
+        });
+        
+        test('audioManager module', () => {
+            if (typeof audioManager === 'undefined') {
+                throw new Error('audioManager is not defined');
+            }
+        });
+        
+        test('gameState module', () => {
+            if (typeof gameState === 'undefined') {
+                throw new Error('gameState is not defined');
+            }
+        });
+        
+        // Test 3: Check if GameEngine class can be instantiated
+        test('GameEngine class', () => {
+            if (typeof GameEngine === 'undefined') {
+                throw new Error('GameEngine class is not defined');
+            }
+        });
+        
+        // Load the actual game modules
+        const scripts = [
+            'three.min.js',
+            'js/constants.js',
+            'js/levels.js',
+            'js/assets.js',
+            'js/audio.js',
+            'js/state.js',
+            'js/main.js'
+        ];
+        
+        let loaded = 0;
+        
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error(`Failed to load ${src}`));
+                document.head.appendChild(script);
+            });
+        }
+        
+        async function loadAllScripts() {
+            for (const src of scripts) {
+                try {
+                    await loadScript(src);
+                    loaded++;
+                } catch (error) {
+                    results.push(`✗ Failed to load ${src}: ${error.message}`);
+                }
+            }
+            
+            // Run tests after all scripts are loaded
+            setTimeout(runTests, 100);
+        }
+        
+        // Start loading
+        loadAllScripts();
+    </script>
+</body>
+</html>
