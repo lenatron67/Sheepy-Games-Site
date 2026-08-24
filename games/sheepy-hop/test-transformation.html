@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sheepy Hop Transformation Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { margin: 5px; padding: 10px; }
+        #log { background: #f0f0f0; padding: 10px; margin-top: 20px; height: 200px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>Sheepy Hop Transformation Test</h1>
+    <p>This test simulates collecting pink coins to trigger transformation.</p>
+    
+    <button onclick="collectPinkCoin()">Collect Pink Coin</button>
+    <button onclick="collect10PinkCoins()">Collect 10 Pink Coins</button>
+    <button onclick="collectGoldCoin()">Collect Gold Coin</button>
+    <button onclick="collect10GoldCoins()">Collect 10 Gold Coins</button>
+    <button onclick="resetGame()">Reset Game</button>
+    
+    <div id="log"></div>
+    
+    <script>
+        const log = document.getElementById('log');
+        
+        function addLog(message) {
+            log.innerHTML += message + '<br>';
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function collectPinkCoin() {
+            if (window.gameState) {
+                window.gameState.collectPinkCoin();
+                addLog(`Collected pink coin. Total: ${window.gameState.pinkCoinsCollected}`);
+                
+                const result = window.gameState.checkProgression();
+                if (result) {
+                    addLog('Progression triggered!');
+                }
+            } else {
+                addLog('ERROR: gameState not found');
+            }
+        }
+        
+        function collect10PinkCoins() {
+            if (window.gameState) {
+                for (let i = 0; i < 10; i++) {
+                    window.gameState.collectPinkCoin();
+                }
+                addLog(`Collected 10 pink coins. Total: ${window.gameState.pinkCoinsCollected}`);
+                
+                const result = window.gameState.checkProgression();
+                if (result) {
+                    addLog('Progression triggered!');
+                }
+            } else {
+                addLog('ERROR: gameState not found');
+            }
+        }
+        
+        function collectGoldCoin() {
+            if (window.gameState) {
+                window.gameState.collectGoldCoin();
+                addLog(`Collected gold coin. Total: ${window.gameState.goldCoinsCollected}`);
+                
+                const result = window.gameState.checkProgression();
+                if (result) {
+                    addLog('Progression triggered!');
+                }
+            } else {
+                addLog('ERROR: gameState not found');
+            }
+        }
+        
+        function collect10GoldCoins() {
+            if (window.gameState) {
+                for (let i = 0; i < 10; i++) {
+                    window.gameState.collectGoldCoin();
+                }
+                addLog(`Collected 10 gold coins. Total: ${window.gameState.goldCoinsCollected}`);
+                
+                const result = window.gameState.checkProgression();
+                if (result) {
+                    addLog('Progression triggered!');
+                }
+            } else {
+                addLog('ERROR: gameState not found');
+            }
+        }
+        
+        function resetGame() {
+            if (window.gameState) {
+                window.gameState.reset();
+                addLog('Game reset');
+            } else {
+                addLog('ERROR: gameState not found');
+            }
+        }
+        
+        // Load the game modules
+        const scripts = [
+            'three.min.js',
+            'js/constants.js',
+            'js/levels.js',
+            'js/assets.js',
+            'js/audio.js',
+            'js/state.js',
+            'js/main.js'
+        ];
+        
+        let loaded = 0;
+        
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error(`Failed to load ${src}`));
+                document.head.appendChild(script);
+            });
+        }
+        
+        async function loadAllScripts() {
+            for (const src of scripts) {
+                try {
+                    await loadScript(src);
+                    loaded++;
+                    addLog(`Loaded: ${src}`);
+                } catch (error) {
+                    addLog(`ERROR loading ${src}: ${error.message}`);
+                }
+            }
+            
+            addLog('All scripts loaded. Ready to test.');
+            addLog(`gameState: ${window.gameState ? 'available' : 'missing'}`);
+            addLog(`gameEngine: ${window.gameEngine ? 'available' : 'missing'}`);
+        }
+        
+        // Start loading
+        loadAllScripts();
+    </script>
+</body>
+</html>

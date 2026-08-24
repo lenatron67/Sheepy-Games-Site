@@ -1,146 +1,527 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sheepy Games — Coming Soon!</title>
-<style>
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(180deg, #bfe9ff 0%, #eaf7f0 55%, #d9f2c4 100%);
-    overflow: hidden;
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sheepy Games — Baa-rilliant Fun for Kids!</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@700;800&display=swap" rel="stylesheet">
 
-  .sky {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-  }
+  <style>
+    /* CSS Variables & Reset */
+    :root {
+      --sky-blue: #72CCFF;
+      --grass-green: #7CD936;
+      --deep-green: #58B01C;
+      --fluff-white: #FFFFFF;
+      --wool-bg: #FFFDF8;
+      --sunny-yellow: #FFDF00;
+      --bright-orange: #FF8811;
+      --bubble-pink: #FF6584;
+      --text-color: #2D3142;
+      --shadow-color: rgba(45, 49, 66, 0.15);
+    }
 
-  .cloud {
-    position: absolute;
-    background: white;
-    border-radius: 50px;
-    opacity: 0.85;
-    filter: blur(0.5px);
-  }
-  .cloud::before, .cloud::after {
-    content: "";
-    position: absolute;
-    background: white;
-    border-radius: 50%;
-  }
-  .cloud1 { width: 120px; height: 40px; top: 10%; left: 8%; }
-  .cloud1::before { width: 60px; height: 60px; top: -30px; left: 15px; }
-  .cloud1::after { width: 45px; height: 45px; top: -20px; left: 60px; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Fredoka', sans-serif;
+    }
 
-  .cloud2 { width: 90px; height: 32px; top: 18%; right: 10%; }
-  .cloud2::before { width: 45px; height: 45px; top: -22px; left: 10px; }
-  .cloud2::after { width: 35px; height: 35px; top: -15px; left: 45px; }
+    body {
+      background-color: var(--wool-bg);
+      color: var(--text-color);
+      overflow-x: hidden;
+    }
 
-  .cloud3 { width: 100px; height: 36px; bottom: 30%; left: 4%; opacity: 0.7; }
-  .cloud3::before { width: 50px; height: 50px; top: -25px; left: 12px; }
-  .cloud3::after { width: 38px; height: 38px; top: -16px; left: 50px; }
+    /* Floating Clouds Animation */
+    @keyframes floatCloud {
+      0% { transform: translateX(-150px); }
+      100% { transform: translateX(100vw); }
+    }
 
-  .content {
-    position: relative;
-    z-index: 2;
-    padding: 24px;
-  }
+    @keyframes bounceHero {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-12px) rotate(2deg); }
+    }
 
-  .sheep {
-    font-size: 6rem;
-    display: inline-block;
-    animation: bounce 2.2s ease-in-out infinite;
-  }
+    @keyframes wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-5deg); }
+      75% { transform: rotate(5deg); }
+    }
 
-  @keyframes bounce {
-    0%, 100% { transform: translateY(0) rotate(-2deg); }
-    50% { transform: translateY(-18px) rotate(2deg); }
-  }
+    /* Top Navigation Header */
+    header {
+      background-color: var(--fluff-white);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 15px var(--shadow-color);
+      position: relative;
+      z-index: 10;
+    }
 
-  h1 {
-    font-size: clamp(2rem, 8vw, 3.5rem);
-    color: #3a5a40;
-    margin: 10px 0 6px;
-    text-shadow: 2px 2px 0 rgba(255,255,255,0.6);
-  }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--bright-orange);
+      text-decoration: none;
+    }
 
-  p.tagline {
-    font-size: clamp(1rem, 4vw, 1.3rem);
-    color: #4a4a4a;
-    margin: 0 0 24px;
-    font-weight: 500;
-  }
+    .nav-btn {
+      background-color: var(--bubble-pink);
+      color: white;
+      padding: 0.6rem 1.4rem;
+      border-radius: 50px;
+      text-decoration: none;
+      font-weight: 700;
+      box-shadow: 0 4px 0 #D63353;
+      transition: all 0.2s ease;
+    }
 
-  .badge {
-    display: inline-block;
-    background: #ffffffcc;
-    border: 2px dashed #7ea87a;
-    color: #3a5a40;
-    padding: 10px 22px;
-    border-radius: 999px;
-    font-weight: 600;
-    font-size: 1rem;
-    letter-spacing: 0.5px;
-  }
+    .nav-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #D63353;
+    }
 
-  .grass {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 12%;
-    background: #a9d68f;
-    border-top: 4px solid #8fc274;
-  }
+    /* Hero Section */
+    .hero {
+      background: linear-gradient(180deg, var(--sky-blue) 0%, #A3E0FF 70%, var(--grass-green) 70%, var(--deep-green) 100%);
+      padding: 3rem 1.5rem 6rem 1.5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
 
-  .grass::before {
-    content: "🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾 🌱 🌾";
-    position: absolute;
-    top: -18px;
-    left: 0;
-    width: 100%;
-    font-size: 20px;
-    letter-spacing: 12px;
-    white-space: nowrap;
-    overflow: hidden;
-  }
+    .cloud {
+      position: absolute;
+      background: white;
+      border-radius: 50px;
+      opacity: 0.8;
+      pointer-events: none;
+    }
 
-  footer {
-    position: absolute;
-    bottom: 2%;
-    width: 100%;
-    text-align: center;
-    z-index: 3;
-    font-size: 0.85rem;
-    color: #3a5a40cc;
-  }
-</style>
+    .cloud::before, .cloud::after {
+      content: '';
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+    }
+
+    .cloud-1 {
+      width: 120px; height: 40px; top: 15%;
+      animation: floatCloud 25s linear infinite;
+    }
+    .cloud-1::before { width: 50px; height: 50px; top: -20px; left: 20px; }
+    .cloud-1::after { width: 40px; height: 40px; top: -15px; right: 20px; }
+
+    .cloud-2 {
+      width: 160px; height: 50px; top: 40%;
+      animation: floatCloud 18s linear infinite;
+      animation-delay: -8s;
+    }
+    .cloud-2::before { width: 60px; height: 60px; top: -25px; left: 25px; }
+    .cloud-2::after { width: 50px; height: 50px; top: -20px; right: 25px; }
+
+    .hero-container {
+      max-width: 800px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 2;
+    }
+
+    .sheep-hero-img {
+      width: 180px;
+      height: 180px;
+      margin-bottom: 1rem;
+      animation: bounceHero 3s ease-in-out infinite;
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      color: white;
+      text-shadow: 3px 3px 0px var(--text-color);
+      margin-bottom: 0.8rem;
+      line-height: 1.1;
+    }
+
+    .hero p {
+      font-size: 1.3rem;
+      color: white;
+      background: rgba(0, 0, 0, 0.15);
+      padding: 0.5rem 1.2rem;
+      border-radius: 20px;
+      display: inline-block;
+      margin-bottom: 1.8rem;
+    }
+
+    .cta-btn {
+      display: inline-block;
+      background-color: var(--sunny-yellow);
+      color: var(--text-color);
+      font-size: 1.5rem;
+      font-weight: 700;
+      padding: 1rem 2.5rem;
+      border-radius: 50px;
+      text-decoration: none;
+      box-shadow: 0 6px 0 #C9AF00, 0 10px 20px rgba(0,0,0,0.15);
+      transition: all 0.2s ease;
+    }
+
+    .cta-btn:hover {
+      transform: translateY(-3px) scale(1.03);
+      box-shadow: 0 9px 0 #C9AF00, 0 12px 25px rgba(0,0,0,0.2);
+    }
+
+    .cta-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 4px 0 #C9AF00;
+    }
+
+    /* Category Filter Tags */
+    .filter-bar {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding: 2rem 1rem 1rem 1rem;
+      flex-wrap: wrap;
+    }
+
+    .tag {
+      background: white;
+      padding: 0.6rem 1.2rem;
+      border-radius: 30px;
+      font-weight: 700;
+      color: var(--text-color);
+      border: 2px solid #E0E0E0;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tag:hover, .tag.active {
+      background-color: var(--bright-orange);
+      color: white;
+      border-color: var(--bright-orange);
+      transform: translateY(-2px);
+    }
+
+    /* Content Cards Grid */
+    .main-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem 4rem 1.5rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 2rem;
+      margin-top: 1rem;
+    }
+
+    .card {
+      background: white;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 8px 20px var(--shadow-color);
+      border: 4px solid white;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .card:hover {
+      transform: translateY(-10px) scale(1.02);
+      box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+    }
+
+    .card-thumbnail {
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .card-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 0.3rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .card-body {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+
+    .card h3 {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .card p {
+      font-family: 'Nunito', sans-serif;
+      color: #666;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      margin-bottom: 1.2rem;
+      flex-grow: 1;
+    }
+
+    .play-btn {
+      display: block;
+      text-align: center;
+      background-color: var(--grass-green);
+      color: white;
+      padding: 0.8rem;
+      border-radius: 16px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 1.1rem;
+      box-shadow: 0 4px 0 var(--deep-green);
+      transition: all 0.2s ease;
+    }
+
+    .card:hover .play-btn {
+      animation: wiggle 0.5s ease-in-out;
+      background-color: var(--deep-green);
+    }
+
+    /* Individual Card Color Themes */
+    .card-1 .card-thumbnail { background-color: #FFD166; }
+    .card-2 .card-thumbnail { background-color: #06D6A0; }
+    .card-3 .card-thumbnail { background-color: #118AB2; }
+    .card-4 .card-thumbnail { background-color: #FF70A6; }
+    .card-5 .card-thumbnail { background-color: #A3C4F3; }
+    .card-6 .card-thumbnail { background-color: #F94144; }
+
+    /* Footer */
+    footer {
+      background-color: var(--text-color);
+      color: white;
+      text-align: center;
+      padding: 2.5rem 1rem;
+      margin-top: 2rem;
+    }
+
+    footer p {
+      font-family: 'Nunito', sans-serif;
+      font-size: 0.9rem;
+      opacity: 0.8;
+      margin-top: 0.5rem;
+    }
+
+    /* Mobile Adjustments */
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 2.2rem; }
+      .hero p { font-size: 1rem; }
+      .cta-btn { font-size: 1.2rem; padding: 0.8rem 1.8rem; }
+      .sheep-hero-img { width: 130px; height: 130px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
-  <div class="sky">
-    <div class="cloud cloud1"></div>
-    <div class="cloud cloud2"></div>
-    <div class="cloud cloud3"></div>
 
-    <div class="content">
-      <div class="sheep">🐑</div>
-      <h1>Sheepy is coming soon!</h1>
-      <p class="tagline">A flock of fun games are on their way.</p>
-      <div class="badge">🐑 Stay Sheepy, come back soon 🐑</div>
+  <!-- Top Navigation Bar -->
+  <header>
+    <a href="#" class="logo">
+      <!-- Cute Sheep Face SVG Logo -->
+      <svg width="40" height="40" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="35" fill="#FFFFFF" stroke="#2D3142" stroke-width="4"/>
+        <circle cx="35" cy="35" r="12" fill="#FFFFFF"/>
+        <circle cx="65" cy="35" r="12" fill="#FFFFFF"/>
+        <circle cx="50" cy="30" r="14" fill="#FFFFFF"/>
+        <rect x="38" y="45" width="24" height="28" rx="12" fill="#2D3142"/>
+        <circle cx="43" cy="53" r="2.5" fill="#FFFFFF"/>
+        <circle cx="57" cy="53" r="2.5" fill="#FFFFFF"/>
+        <ellipse cx="25" cy="45" rx="8" ry="5" fill="#FF8811" transform="rotate(-20 25 45)"/>
+        <ellipse cx="75" cy="45" rx="8" ry="5" fill="#FF8811" transform="rotate(20 75 45)"/>
+      </svg>
+      Sheepy Games
+    </a>
+    <a href="#games" class="nav-btn">Play Now!</a>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="cloud cloud-1"></div>
+    <div class="cloud cloud-2"></div>
+
+    <div class="hero-container">
+      <!-- Big Fluffy Sheep SVG Graphic -->
+      <svg class="sheep-hero-img" viewBox="0 0 200 200">
+        <!-- Body Fluff -->
+        <circle cx="100" cy="110" r="45" fill="#FFFFFF"/>
+        <circle cx="70" cy="100" r="35" fill="#FFFFFF"/>
+        <circle cx="130" cy="100" r="35" fill="#FFFFFF"/>
+        <circle cx="75" cy="130" r="30" fill="#FFFFFF"/>
+        <circle cx="125" cy="130" r="30" fill="#FFFFFF"/>
+        <circle cx="100" cy="140" r="35" fill="#FFFFFF"/>
+        <!-- Legs -->
+        <rect x="80" y="150" width="10" height="30" rx="5" fill="#2D3142"/>
+        <rect x="110" y="150" width="10" height="30" rx="5" fill="#2D3142"/>
+        <!-- Head -->
+        <ellipse cx="100" cy="95" rx="22" ry="28" fill="#2D3142"/>
+        <!-- Ears -->
+        <ellipse cx="72" cy="85" rx="14" ry="7" fill="#2D3142" transform="rotate(-20 72 85)"/>
+        <ellipse cx="128" cy="85" rx="14" ry="7" fill="#2D3142" transform="rotate(20 128 85)"/>
+        <!-- Hair Puff -->
+        <circle cx="100" cy="70" r="12" fill="#FFFFFF"/>
+        <circle cx="92" cy="73" r="9" fill="#FFFFFF"/>
+        <circle cx="108" cy="73" r="9" fill="#FFFFFF"/>
+        <!-- Eyes & Cheeks -->
+        <circle cx="92" cy="92" r="4" fill="#FFFFFF"/>
+        <circle cx="108" cy="92" r="4" fill="#FFFFFF"/>
+        <circle cx="93" cy="93" r="2" fill="#000000"/>
+        <circle cx="109" cy="93" r="2" fill="#000000"/>
+        <ellipse cx="88" cy="102" rx="4" ry="2" fill="#FF6584"/>
+        <ellipse cx="112" cy="102" rx="4" ry="2" fill="#FF6584"/>
+        <!-- Smile -->
+        <path d="M 96 106 Q 100 110 104 106" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+
+      <h1>Baa-rilliant Games by Sheepy</h1>
+      <p>Fun games, stories & creative activities!</p>
+      <div>
+        <a href="#games" class="cta-btn">Jump In & Play! 🚀</a>
+      </div>
     </div>
+  </section>
 
-    <div class="grass"></div>
-    <footer>sheepygames.io</footer>
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <button class="tag active">All Fun</button>
+    <button class="tag">🎮 Mini-Games</button>
+    <button class="tag">🎨 Colouring</button>
+    <button class="tag">📚 Bedtime Stories</button>
+    <button class="tag">🧩 Puzzles</button>
   </div>
+
+  <!-- Content Grid -->
+  <main class="main-container" id="games">
+    <div class="grid">
+
+      <!-- Card 1 -->
+      <article class="card card-1">
+        <div class="card-thumbnail">
+          <span class="card-badge">🎮 Mini-Game</span>
+          <svg width="90" height="90" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="35" fill="#FF8811"/>
+            <path d="M 35 50 L 65 35 L 65 65 Z" fill="#FFFFFF"/>
+          </svg>
+        </div>
+        <div class="card-body">
+          <h3>Sheepy Hop</h3>
+          <p>Help Sheepy collect coins and dodge enemies!</p>
+          <a href="games/sheepy-hop/" class="play-btn">Play Now</a>
+        </div>
+      </article>
+
+      <!-- Card 2 -->
+      <article class="card card-2">
+        <div class="card-thumbnail">
+          <span class="card-badge">??????</span>
+          <svg width="90" height="90" viewBox="0 0 100 100">
+            <path d="M30 70 Q 50 20 70 70" stroke="#FFFFFF" stroke-width="12" fill="none" stroke-linecap="round"/>
+            <circle cx="70" cy="70" r="8" fill="#FFDF00"/>
+          </svg>
+        </div>
+        <div class="card-body">
+          <h3>Coming Soon!</h3>
+          <p>What is going to be unlocked next!</p>
+          <!--<a href="#" class="play-btn">Start Painting</a>-->
+        </div>
+      </article>
+
+      <!-- Card 3
+      <article class="card card-3">
+        <div class="card-thumbnail">
+          <span class="card-badge">🧩 Puzzle</span>
+          <svg width="90" height="90" viewBox="0 0 100 100">
+            <rect x="25" y="25" width="22" height="22" rx="4" fill="#FFFFFF"/>
+            <rect x="53" y="25" width="22" height="22" rx="4" fill="#FFDF00"/>
+            <rect x="25" y="53" width="22" height="22" rx="4" fill="#FF6584"/>
+            <rect x="53" y="53" width="22" height="22" rx="4" fill="#FFFFFF"/>
+          </svg>
+        </div>
+        <div class="card-body">
+          <h3>Farmyard Match-3</h3>
+          <p>Match cute farm animals, match snacks, and beat your highest score!</p>
+          <a href="#" class="play-btn">Solve Puzzle</a>
+        </div>
+      </article>
+
+
+      <article class="card card-4">
+        <div class="card-thumbnail">
+          <span class="card-badge">📚 Story</span>
+          <svg width="90" height="90" viewBox="0 0 100 100">
+            <path d="M 25 35 Q 50 25 75 35 L 75 75 Q 50 65 25 75 Z" fill="#FFFFFF"/>
+            <line x1="50" y1="30" x2="50" y2="70" stroke="#FF70A6" stroke-width="4"/>
+          </svg>
+        </div>
+        <div class="card-body">
+          <h3>The Little Woolly Cloud</h3>
+          <p>An interactive, cozy bedtime story about a sheep who wanted to fly.</p>
+          <a href="#" class="play-btn">Read Story</a>
+        </div>
+      </article>
+
+
+      <article class="card card-5">
+        <div class="card-thumbnail">
+          <span class="card-badge">🎮 Mini-Game</span>
+          <svg width="90" height="90" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="30" fill="#FFFFFF"/>
+            <circle cx="50" cy="50" r="18" fill="#A3C4F3"/>
+            <circle cx="50" cy="50" r="8" fill="#FF6584"/>
+          </svg>
+        </div>
+        <div class="card-body">
+          <h3>Count the Sheep!</h3>
+          <p>Test how fast you can count jumping sheep before bedtime comes!</p>
+          <a href="#" class="play-btn">Play Now</a>
+        </div>
+      </article>
+
+      <article class="card card-6">
+        <div class="card-thumbnail">
+          <span class="card-badge">🎨 Creative</span>
+          <svg width="90" height="90" viewBox="0 0 100 100">
+            <polygon points="50,15 63,40 90,44 70,63 75,90 50,75 25,90 30,63 10,44 37,40" fill="#FFDF00"/>
+          </svg>
+        </div>
+        <div class="card-body">
+          <h3>Dress-Up Barnaby</h3>
+          <p>Pick funny hats, cool sunglasses, and silly boots for your favourite sheep!</p>
+          <a href="#" class="play-btn">Get Stylin'</a>
+        </div>
+      </article>-->
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>🐑 <strong>Sheepy Games</strong> — Ad-Free & Pure Fun!</p>
+    <p>&copy; 2026 Sheepy Games. Made with ❤️ for sheepy and blankie.</p>
+  </footer>
+
 </body>
 </html>
