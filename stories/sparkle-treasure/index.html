@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sheepy and the Sparkle Treasure — Sheepy Games</title>
+  <meta name="description" content="A cosy bedtime story about Sheepy and Blankie searching for a hidden treasure.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --grass-green: #7CD936;
+      --deep-green: #58B01C;
+      --wool-bg: #FFFDF8;
+      --sunny-yellow: #FFDF00;
+      --bright-orange: #FF8811;
+      --text-color: #2D3142;
+      --shadow-color: rgba(45, 49, 66, 0.15);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Fredoka', sans-serif; }
+
+    body {
+      background: linear-gradient(180deg, #FFE9F0 0%, var(--wool-bg) 45%);
+      color: var(--text-color);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .story-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.9rem 1.2rem;
+      background: white;
+      box-shadow: 0 4px 15px var(--shadow-color);
+      position: relative;
+      z-index: 10;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--bright-orange);
+      font-weight: 700;
+      font-size: 1.05rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 50px;
+      transition: background-color 0.2s ease;
+    }
+
+    .back-link:hover { background-color: #FFF1E2; }
+
+    .story-title-small {
+      font-weight: 700;
+      font-size: 1rem;
+      opacity: 0.65;
+      text-align: right;
+    }
+
+    main { flex-grow: 1; display: flex; flex-direction: column; }
+
+    /* Cover */
+    .cover {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      padding: 2rem 1.5rem 3rem;
+      text-align: center;
+    }
+
+    .cover img {
+      width: min(340px, 72vw);
+      height: auto;
+      border-radius: 18px;
+      box-shadow: 0 14px 34px rgba(0,0,0,0.22);
+      animation: coverFloat 4s ease-in-out infinite;
+    }
+
+    @keyframes coverFloat {
+      0%, 100% { transform: translateY(0) rotate(-1deg); }
+      50%      { transform: translateY(-10px) rotate(1deg); }
+    }
+
+    .cover p {
+      font-family: 'Nunito', sans-serif;
+      font-size: 1.05rem;
+      max-width: 34ch;
+      opacity: 0.75;
+    }
+
+    .start-btn {
+      background-color: var(--sunny-yellow);
+      color: var(--text-color);
+      font-size: 1.45rem;
+      font-weight: 700;
+      padding: 0.9rem 2.4rem;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #C9AF00, 0 10px 20px rgba(0,0,0,0.15);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .start-btn:hover { transform: translateY(-3px); box-shadow: 0 9px 0 #C9AF00, 0 12px 25px rgba(0,0,0,0.2); }
+    .start-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #C9AF00; }
+
+    /* Reader */
+    .reader {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 1050px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem 1.2rem 1rem;
+    }
+
+    .spread {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 2rem;
+      align-items: center;
+      flex-grow: 1;
+    }
+
+    .page-art {
+      border-radius: 22px;
+      box-shadow: 0 10px 26px var(--shadow-color);
+      background: white;
+      display: block;
+      aspect-ratio: 896 / 1280;
+      object-fit: cover;
+      max-height: 62vh;
+      max-width: 100%;
+      width: auto;
+      margin: 0 auto;
+    }
+
+    .page-text {
+      font-family: 'Nunito', sans-serif;
+      font-weight: 700;
+      font-size: clamp(1.1rem, 1rem + 0.7vw, 1.5rem);
+      line-height: 1.65;
+      background: white;
+      padding: 1.8rem;
+      border-radius: 22px;
+      box-shadow: 0 10px 26px var(--shadow-color);
+    }
+
+    .page-art, .page-text { transition: opacity 0.25s ease, transform 0.25s ease; }
+
+    .spread.turning .page-art,
+    .spread.turning .page-text { opacity: 0; transform: translateY(8px); }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.2rem;
+      padding: 1.4rem 0 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .nav-btn {
+      background-color: var(--grass-green);
+      color: white;
+      border: none;
+      font-size: 1.15rem;
+      font-weight: 700;
+      padding: 0.85rem 1.8rem;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 5px 0 var(--deep-green);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      min-width: 130px;
+    }
+
+    .nav-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 0 var(--deep-green); }
+    .nav-btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 var(--deep-green); }
+
+    .nav-btn:disabled {
+      background-color: #D8D8D8;
+      box-shadow: 0 5px 0 #BBB;
+      cursor: default;
+      opacity: 0.7;
+    }
+
+    .dots { display: flex; gap: 7px; }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #E2D9CC;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      transition: transform 0.2s ease, background-color 0.2s ease;
+    }
+
+    .dot:hover { transform: scale(1.3); }
+    .dot.current { background: var(--bright-orange); transform: scale(1.35); }
+
+    .page-count {
+      font-weight: 700;
+      opacity: 0.6;
+      font-size: 0.95rem;
+      width: 100%;
+      text-align: center;
+    }
+
+    /* The End */
+    .ending {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.3rem;
+      text-align: center;
+      padding: 3rem 1.5rem;
+    }
+
+    .ending h2 { font-size: 2.6rem; color: var(--bright-orange); }
+    .ending p { font-family: 'Nunito', sans-serif; font-size: 1.1rem; opacity: 0.75; }
+    .ending-actions { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+
+    .ghost-btn {
+      background: white;
+      color: var(--text-color);
+      border: 3px solid #E7DFD3;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 0.8rem 1.8rem;
+      border-radius: 50px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.2s ease;
+    }
+
+    .ghost-btn:hover { border-color: var(--bright-orange); color: var(--bright-orange); transform: translateY(-2px); }
+
+    footer {
+      text-align: center;
+      padding: 1.4rem 1rem 2rem;
+      font-family: 'Nunito', sans-serif;
+      font-size: 0.85rem;
+      opacity: 0.55;
+    }
+
+    [hidden] { display: none !important; }
+
+    @media (max-width: 780px) {
+      .spread { grid-template-columns: 1fr; gap: 1.2rem; }
+      .page-art { max-height: 42vh; }
+      .page-text { padding: 1.3rem; text-align: center; }
+      .nav-btn { min-width: 110px; padding: 0.8rem 1.3rem; }
+      .story-title-small { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="story-header">
+    <a class="back-link" href="../../#games">&#8592; All Games</a>
+    <span class="story-title-small">Sheepy and the Sparkle Treasure</span>
+  </header>
+
+  <main>
+    <!-- Cover -->
+    <section class="cover" id="cover">
+      <img src="images/cover.jpg" width="900" height="1075"
+           alt="Book cover: Sheepy and the Sparkle Treasure, by Michael Leonard">
+      <p>A cosy bedtime story about a fluffy sheep, his best friend Blankie, and the treasure they were really looking for.</p>
+      <button class="start-btn" id="startBtn" type="button">Read the Story &#128214;</button>
+    </section>
+
+    <!-- Reader -->
+    <section class="reader" id="reader" hidden>
+      <div class="spread" id="spread">
+        <img class="page-art" id="pageArt" src="" alt="" width="896" height="1280">
+        <p class="page-text" id="pageText"></p>
+      </div>
+
+      <div class="controls">
+        <button class="nav-btn" id="prevBtn" type="button">&#8592; Back</button>
+        <div class="dots" id="dots"></div>
+        <button class="nav-btn" id="nextBtn" type="button">Next &#8594;</button>
+        <span class="page-count" id="pageCount"></span>
+      </div>
+    </section>
+
+    <!-- The End -->
+    <section class="ending" id="ending" hidden>
+      <h2>The End &#127880;</h2>
+      <p>Sweet dreams, from Sheepy and Blankie.</p>
+      <div class="ending-actions">
+        <button class="start-btn" id="againBtn" type="button">Read It Again &#128257;</button>
+        <a class="ghost-btn" href="../../#games">More Sheepy Fun</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>&#128017; Sheepy Games &mdash; Ad-Free &amp; Pure Fun!</footer>
+
+  <script>
+    (function () {
+      var STORY = [
+        "In a land of soft grass and marshmallow clouds lived a very fluffy sheep named Sheepy. He was never alone because he had his best friend in the whole world, Blankie. Blankie was a very special comfort blanket with a friendly unicorn head. Together, they loved to dream of big adventures.",
+        "One sunny morning, Sheepy found a tiny, shimmering map tucked under a clover. \"Look, Blankie!\" he bleated happily. \"It shows a path to a hidden treasure. Shall we go find it?\" Blankie didn’t say a word, but the unicorn's soft horn seemed to glow with excitement.",
+        "Their journey began at the edge of the Sparkling Stream. The water danced and hopped over round, smooth stones. Sheepy reached the bank and looked at the water. It looked very cold and very wet! Sheepy dipped one hoof in and shivered.",
+        "Blankie knew exactly what to do. With a gentle breeze, Blankie floated into the air and laid across the stream like a soft, magical bridge. The unicorn head peeked out from the far side, encouraging Sheepy to cross safely without getting his wool wet.",
+        "After the stream, they arrived at the Colorful Meadow. It was the brightest place Sheepy had ever seen! There were flowers of every color—red, orange, yellow, and purple—stretching as far as the eye could see. Sheepy and Blankie ran through the petals together.",
+        "Sheepy stopped to sniff a giant, glowing blue flower. As he took a deep breath, a group of friendly butterflies fluttered up into the sky. \"Everything is so beautiful,\" Sheepy whispered. He felt very small in such a big, wonderful world.",
+        "Suddenly, a gust of wind caught Blankie! The blanket swirled up high, dancing toward the top of a big, rolling hill. Blankie looked like a kite, soaring through the air and pointing the way toward the highest peak where the grass was the softest.",
+        "At the very top of the hill, they found an old, wooden chest covered in shiny glitter. Sheepy’s heart went pitter-patter. He and Blankie stood before the chest. \"This must be it!\" Sheepy cried. He slowly lifted the lid to see what was inside.",
+        "Inside the chest, there was no gold or silver. Instead, there was a big, round mirror. When Sheepy looked in, he saw himself, and he saw Blankie right beside him. He realized that the real treasure was the fun they had and the friendship they shared.",
+        "The sun began to set, turning the sky into a soft pink blanket. Sheepy was tired after his long journey. He curled up on the soft grass of the hill, wrapped himself tightly in Blankie, and fell fast asleep, dreaming of their next big adventure."
+      ];
+
+      var cover = document.getElementById('cover');
+      var reader = document.getElementById('reader');
+      var ending = document.getElementById('ending');
+      var spread = document.getElementById('spread');
+      var art = document.getElementById('pageArt');
+      var text = document.getElementById('pageText');
+      var prevBtn = document.getElementById('prevBtn');
+      var nextBtn = document.getElementById('nextBtn');
+      var dotsBox = document.getElementById('dots');
+      var pageCount = document.getElementById('pageCount');
+
+      var index = 0;
+
+      function src(i) {
+        return 'images/page-' + String(i + 1).padStart(2, '0') + '.jpg';
+      }
+
+      var dots = STORY.map(function (_, i) {
+        var d = document.createElement('button');
+        d.className = 'dot';
+        d.type = 'button';
+        d.setAttribute('aria-label', 'Go to page ' + (i + 1));
+        d.addEventListener('click', function () { go(i); });
+        dotsBox.appendChild(d);
+        return d;
+      });
+
+      function preload(i) {
+        if (i >= 0 && i < STORY.length) { new Image().src = src(i); }
+      }
+
+      function render() {
+        art.src = src(index);
+        art.alt = 'Illustration for page ' + (index + 1);
+        text.textContent = STORY[index];
+        prevBtn.disabled = index === 0;
+        nextBtn.textContent = index === STORY.length - 1 ? 'Finish ✨' : 'Next →';
+        pageCount.textContent = 'Page ' + (index + 1) + ' of ' + STORY.length;
+        dots.forEach(function (d, i) {
+          d.classList.toggle('current', i === index);
+          d.setAttribute('aria-current', i === index ? 'true' : 'false');
+        });
+        preload(index + 1);
+      }
+
+      function go(i) {
+        if (i < 0) { return; }
+        if (i >= STORY.length) { return finish(); }
+        if (i === index) { return; }
+        index = i;
+        spread.classList.add('turning');
+        setTimeout(function () {
+          render();
+          spread.classList.remove('turning');
+        }, 180);
+      }
+
+      function show(section) {
+        [cover, reader, ending].forEach(function (s) { s.hidden = s !== section; });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function start() {
+        index = 0;
+        render();
+        show(reader);
+      }
+
+      function finish() { show(ending); }
+
+      document.getElementById('startBtn').addEventListener('click', start);
+      document.getElementById('againBtn').addEventListener('click', start);
+      nextBtn.addEventListener('click', function () { go(index + 1); });
+      prevBtn.addEventListener('click', function () { go(index - 1); });
+
+      document.addEventListener('keydown', function (e) {
+        if (reader.hidden) { return; }
+        if (e.key === 'ArrowRight') { go(index + 1); }
+        if (e.key === 'ArrowLeft') { go(index - 1); }
+      });
+
+      var startX = null;
+      spread.addEventListener('touchstart', function (e) {
+        startX = e.changedTouches[0].clientX;
+      }, { passive: true });
+
+      spread.addEventListener('touchend', function (e) {
+        if (startX === null) { return; }
+        var dx = e.changedTouches[0].clientX - startX;
+        if (Math.abs(dx) > 50) { go(index + (dx < 0 ? 1 : -1)); }
+        startX = null;
+      }, { passive: true });
+
+      preload(0);
+    })();
+  </script>
+
+</body>
+</html>
