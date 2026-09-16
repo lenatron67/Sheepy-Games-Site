@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Colouring Corner — Sheepy Games</title>
+  <meta name="description" content="Colour in Sheepy and friends: pick a colour, tap to fill, then print your picture.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --sky-blue: #72CCFF;
+      --grass-green: #7CD936;
+      --deep-green: #58B01C;
+      --wool-bg: #FFFDF8;
+      --sunny-yellow: #FFDF00;
+      --bright-orange: #FF8811;
+      --bubble-pink: #FF6584;
+      --text-color: #2D3142;
+      --shadow-color: rgba(45, 49, 66, 0.15);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Fredoka', sans-serif; }
+
+    body {
+      background: linear-gradient(180deg, #E3F4FF 0%, var(--wool-bg) 45%);
+      color: var(--text-color);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* While colouring, the page fills the screen exactly so nothing scrolls under little fingers */
+    body.is-colouring {
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    button { touch-action: manipulation; }
+
+    /* Header */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.7rem 1.2rem;
+      background: white;
+      box-shadow: 0 4px 15px var(--shadow-color);
+      position: relative;
+      z-index: 10;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--bright-orange);
+      font-weight: 700;
+      font-size: 1.05rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 50px;
+      transition: background-color 0.2s ease;
+    }
+
+    .back-link:hover { background-color: #FFF1E2; }
+
+    .top-title {
+      font-weight: 700;
+      font-size: 1rem;
+      opacity: 0.65;
+      text-align: right;
+    }
+
+    main { flex-grow: 1; min-height: 0; display: flex; flex-direction: column; }
+
+    /* Picture picker */
+    .picker {
+      padding: 2rem 1.5rem 3rem;
+      text-align: center;
+    }
+
+    .picker h1 {
+      font-size: 2.4rem;
+      color: var(--bright-orange);
+      margin-bottom: 0.4rem;
+    }
+
+    .picker > p {
+      font-family: 'Nunito', sans-serif;
+      font-size: 1.1rem;
+      opacity: 0.75;
+      margin-bottom: 2rem;
+    }
+
+    .picture-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1.8rem;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .picture-card {
+      background: white;
+      border: 4px solid white;
+      border-radius: 24px;
+      box-shadow: 0 8px 20px var(--shadow-color);
+      overflow: hidden;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      color: var(--text-color);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+    }
+
+    .picture-card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 15px 30px rgba(0,0,0,0.15); }
+
+    .picture-card .thumb {
+      display: block;
+      position: relative;
+      aspect-ratio: 4 / 3;
+    }
+
+    .picture-card .thumb img {
+      position: absolute;
+      inset: 14px;
+      width: calc(100% - 28px);
+      height: calc(100% - 28px);
+      object-fit: contain;
+    }
+
+    .picture-card .label {
+      display: block;
+      margin-top: auto;
+      background: var(--grass-green);
+      color: white;
+      font-size: 1.15rem;
+      font-weight: 700;
+      padding: 0.75rem;
+    }
+
+    .picture-card .badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: var(--sunny-yellow);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 0.25rem 0.7rem;
+      border-radius: 20px;
+    }
+
+    /* Colouring studio */
+    .studio {
+      flex-grow: 1;
+      min-height: 0;
+      display: flex;
+      gap: 12px;
+      padding: 12px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+
+    .stage {
+      flex-grow: 1;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .paper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 10px 26px var(--shadow-color);
+      overflow: hidden;
+    }
+
+    .paper canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #lineCanvas { touch-action: none; cursor: pointer; }
+
+    .loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 1rem;
+      background: white;
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--bright-orange);
+    }
+
+    .toolbar {
+      width: 236px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 9px;
+      background: white;
+      padding: 12px;
+      border-radius: 18px;
+      box-shadow: 0 6px 16px var(--shadow-color);
+    }
+
+    .swatch {
+      aspect-ratio: 1;
+      width: 100%;
+      border-radius: 50%;
+      border: 3px solid rgba(45, 49, 66, 0.15);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .swatch:hover { transform: scale(1.08); }
+
+    .swatch[aria-pressed="true"] {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 3px white, 0 0 0 6px var(--text-color);
+    }
+
+    .swatch.is-white { border-color: rgba(45, 49, 66, 0.35); }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+
+    .action {
+      background: white;
+      color: var(--text-color);
+      border: 3px solid #E7DFD3;
+      border-radius: 16px;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 0.65rem 0.4rem;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    }
+
+    .action:hover:not(:disabled) { border-color: var(--bright-orange); color: var(--bright-orange); }
+    .action:active:not(:disabled) { transform: translateY(2px); }
+    .action:disabled { opacity: 0.45; cursor: default; }
+
+    .action.primary {
+      background: var(--grass-green);
+      border-color: var(--grass-green);
+      color: white;
+      box-shadow: 0 4px 0 var(--deep-green);
+    }
+
+    .action.primary:hover:not(:disabled) { color: white; border-color: var(--grass-green); }
+
+    /* Portrait screens: toolbar moves under the picture */
+    @media (max-aspect-ratio: 1/1) {
+      .studio { flex-direction: column; }
+      .toolbar { width: auto; overflow: visible; }
+      .palette {
+        grid-template-columns: repeat(10, minmax(0, 52px));
+        justify-content: center;
+        gap: 7px;
+        padding: 10px;
+      }
+      .actions { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      .top-title { display: none; }
+      .picker h1 { font-size: 2rem; }
+      .action { font-size: 0.9rem; }
+    }
+
+    /* Print chooser */
+    .print-dialog {
+      position: fixed;
+      inset: 0;
+      background: rgba(45, 49, 66, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      z-index: 50;
+    }
+
+    .print-card {
+      background: white;
+      border-radius: 24px;
+      padding: 1.8rem 1.6rem 1.2rem;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+    }
+
+    .print-card h2 { font-size: 1.6rem; margin-bottom: 1.2rem; }
+
+    .print-options { display: flex; flex-direction: column; gap: 0.8rem; }
+
+    .big-btn {
+      font-size: 1.25rem;
+      font-weight: 700;
+      padding: 0.85rem 1.4rem;
+      border-radius: 50px;
+      cursor: pointer;
+      border: none;
+      transition: transform 0.15s ease;
+    }
+
+    .big-btn:active { transform: translateY(3px); }
+    .big-btn.yellow { background: var(--sunny-yellow); color: var(--text-color); box-shadow: 0 5px 0 #C9AF00; }
+    .big-btn.plain { background: white; color: var(--text-color); border: 3px solid #E7DFD3; }
+
+    .text-btn {
+      margin-top: 1rem;
+      background: none;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #888;
+      cursor: pointer;
+      padding: 0.4rem 1rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1.4rem 1rem 2rem;
+      font-family: 'Nunito', sans-serif;
+      font-size: 0.85rem;
+      opacity: 0.55;
+    }
+
+    body.is-colouring footer { display: none; }
+
+    [hidden] { display: none !important; }
+
+    .print-sheet { display: none; }
+
+    @media print {
+      @page { margin: 12mm; }
+      body { background: white !important; height: auto !important; overflow: visible !important; display: block; }
+      body > *:not(.print-sheet) { display: none !important; }
+      .print-sheet { display: block !important; text-align: center; }
+      .print-sheet img { display: none; width: 100%; height: auto; max-height: 245mm; object-fit: contain; margin: 0 auto; }
+      .print-sheet[data-mode="blank"] .print-blank,
+      .print-sheet[data-mode="coloured"] .print-coloured { display: block; }
+      .print-sheet p { font-size: 11pt; color: #666; margin-top: 5mm; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="top-bar">
+    <a class="back-link" href="../#games">&#8592; All Games</a>
+    <span class="top-title" id="topTitle">Colouring Corner</span>
+  </header>
+
+  <main>
+    <!-- Picture picker -->
+    <section class="picker" id="picker">
+      <h1>Colouring Corner &#127912;</h1>
+      <p>Pick a picture, choose a colour, and tap to fill it in!</p>
+      <div class="picture-grid" id="pictureGrid"></div>
+    </section>
+
+    <!-- Colouring studio -->
+    <section class="studio" id="studio" hidden>
+      <div class="stage" id="stage">
+        <div class="paper" id="paper">
+          <canvas id="fillCanvas"></canvas>
+          <canvas id="lineCanvas" role="img"></canvas>
+          <div class="loading" id="loading">Getting the crayons ready&hellip;</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="palette" id="palette" role="group" aria-label="Colours"></div>
+        <div class="actions">
+          <button class="action" id="undoBtn" type="button">&#8630; Undo</button>
+          <button class="action" id="clearBtn" type="button">&#129533; Start Over</button>
+          <button class="action primary" id="printBtn" type="button">&#128424;&#65039; Print</button>
+          <button class="action" id="pickerBtn" type="button">&#128444;&#65039; Pictures</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>&#128017; Sheepy Games &mdash; Ad-Free &amp; Pure Fun!</footer>
+
+  <div class="print-dialog" id="printDialog" hidden>
+    <div class="print-card" role="dialog" aria-modal="true" aria-labelledby="printHeading">
+      <h2 id="printHeading">What shall we print?</h2>
+      <div class="print-options">
+        <button class="big-btn yellow" type="button" data-print="coloured">My colouring &#127752;</button>
+        <button class="big-btn plain" type="button" data-print="blank">A blank page &#9999;&#65039;</button>
+      </div>
+      <button class="text-btn" type="button" id="printCancel">Not now</button>
+    </div>
+  </div>
+
+  <div class="print-sheet" id="printSheet" data-mode="blank">
+    <img class="print-coloured" id="printColoured" alt="">
+    <img class="print-blank" id="printBlank" alt="">
+    <p id="printCaption"></p>
+  </div>
+
+  <script>
+    (function () {
+      // Add a picture: drop black-on-white line art (SVG or PNG) into pictures/ and list it here.
+      var PICTURES = [
+        { id: 'betty-starry-night', title: "Betty's Starry Night", src: 'pictures/betty-starry-night.svg' },
+        { id: 'sheepy-and-blankie-asleep', title: 'Sheepy & Blankie Fast Asleep', src: 'pictures/sheepy-and-blankie-asleep.png' }
+      ];
+
+      var COLOURS = [
+        ['#E53935', 'Red'], ['#FB8C00', 'Orange'], ['#FDD835', 'Yellow'], ['#FFF59D', 'Lemon'],
+        ['#9CCC65', 'Light green'], ['#2E7D32', 'Green'], ['#26A69A', 'Teal'], ['#81D4FA', 'Sky blue'],
+        ['#1E88E5', 'Blue'], ['#283593', 'Navy'], ['#B39DDB', 'Lavender'], ['#8E24AA', 'Purple'],
+        ['#F8BBD0', 'Light pink'], ['#EC407A', 'Pink'], ['#FFCC80', 'Peach'], ['#A1887F', 'Light brown'],
+        ['#6D4C41', 'Brown'], ['#BDBDBD', 'Grey'], ['#424242', 'Dark grey'], ['#FFFFFF', 'White']
+      ];
+
+      var MAX_SIDE = 1400;   // working resolution of the long side
+      var INK_LEVEL = 160;   // pixels darker than this are outlines
+      var GAP_CLOSE = 1;     // outlines are thickened by this many px when finding areas, sealing hairline gaps
+      var MIN_AREA = 40;     // areas smaller than this are merged into their neighbours
+      var WHITE = 0xFFFFFF;
+      var LINE_RGB = [25, 25, 25];
+      var STORE_PREFIX = 'sheepyColouring:v1:';
+      var MAX_UNDO = 100;
+
+      var picker = document.getElementById('picker');
+      var grid = document.getElementById('pictureGrid');
+      var studio = document.getElementById('studio');
+      var stage = document.getElementById('stage');
+      var paper = document.getElementById('paper');
+      var fillCanvas = document.getElementById('fillCanvas');
+      var lineCanvas = document.getElementById('lineCanvas');
+      var loading = document.getElementById('loading');
+      var palette = document.getElementById('palette');
+      var undoBtn = document.getElementById('undoBtn');
+      var topTitle = document.getElementById('topTitle');
+      var printDialog = document.getElementById('printDialog');
+      var printSheet = document.getElementById('printSheet');
+
+      var fillCtx = fillCanvas.getContext('2d');
+      var lineCtx = lineCanvas.getContext('2d');
+
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      var pic = null;          // picture being coloured
+      var page = null;         // processed picture: areas, pixel lists, bounding boxes
+      var colours = null;      // colour of each area
+      var fillData = null;     // pixels of the colour layer
+      var undoStack = [];
+      var currentColour = parseInt(COLOURS[7][0].slice(1), 16);
+      var openToken = 0;
+      var saveTimer = null;
+      var animation = null;
+      var cameFromPicker = false;
+
+      // ---------- Loading and preparing a picture ----------
+
+      function loadImage(src) {
+        return new Promise(function (resolve, reject) {
+          var img = new Image();
+          img.onload = function () { resolve(img); };
+          img.onerror = function () { reject(new Error('Could not load ' + src)); };
+          img.src = src;
+        });
+      }
+
+      function fitSize(w, h) {
+        var scale = MAX_SIDE / Math.max(w, h);
+        return { W: Math.round(w * scale), H: Math.round(h * scale) };
+      }
+
+      // SVGs are re-sized before drawing so they rasterise sharply at the working size (Safari otherwise scales a small bitmap)
+      function loadPicture(p) {
+        if (!/\.svg$/i.test(p.src)) {
+          return loadImage(p.src).then(function (img) {
+            var size = fitSize(img.naturalWidth, img.naturalHeight);
+            return { img: img, W: size.W, H: size.H };
+          });
+        }
+        return fetch(p.src).then(function (r) {
+          if (!r.ok) { throw new Error('Could not load ' + p.src); }
+          return r.text();
+        }).then(function (text) {
+          var svg = new DOMParser().parseFromString(text, 'image/svg+xml').documentElement;
+          var box = (svg.getAttribute('viewBox') || '').split(/[\s,]+/).map(Number);
+          var w = box.length === 4 ? box[2] : parseFloat(svg.getAttribute('width'));
+          var h = box.length === 4 ? box[3] : parseFloat(svg.getAttribute('height'));
+          if (box.length !== 4) { svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h); }
+          var size = fitSize(w, h);
+          svg.setAttribute('width', size.W);
+          svg.setAttribute('height', size.H);
+          var url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }));
+          return loadImage(url).then(function (img) {
+            URL.revokeObjectURL(url);
+            return { img: img, W: size.W, H: size.H };
+          });
+        });
+      }
+
+      function thicken(mask, W, H) {
+        var N = W * H;
+        var rows = new Uint8Array(N);
+        var out = new Uint8Array(N);
+        var i, x;
+        for (i = 0; i < N; i++) {
+          x = i % W;
+          rows[i] = mask[i] | (x > 0 ? mask[i - 1] : 0) | (x < W - 1 ? mask[i + 1] : 0);
+        }
+        for (i = 0; i < N; i++) {
+          out[i] = rows[i] | (i >= W ? rows[i - W] : 0) | (i < N - W ? rows[i + W] : 0);
+        }
+        return out;
+      }
+
+      // Splits the picture into colourable areas. Every pixel (outlines included) belongs to its nearest
+      // area, so a tap on a line still fills something and colours tuck neatly under the outlines.
+      function preparePage(img, W, H) {
+        var work = document.createElement('canvas');
+        work.width = W;
+        work.height = H;
+        var ctx = work.getContext('2d', { willReadFrequently: true });
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, W, H);
+        ctx.drawImage(img, 0, 0, W, H);
+        var src = ctx.getImageData(0, 0, W, H).data;
+
+        var N = W * H;
+        var lines = ctx.createImageData(W, H);
+        var ld = lines.data;
+        var wall = new Uint8Array(N);
+        var i, p, lum;
+        for (i = 0; i < N; i++) {
+          p = i * 4;
+          lum = (src[p] * 299 + src[p + 1] * 587 + src[p + 2] * 114) / 1000;
+          wall[i] = lum < INK_LEVEL ? 1 : 0;
+          ld[p] = LINE_RGB[0];
+          ld[p + 1] = LINE_RGB[1];
+          ld[p + 2] = LINE_RGB[2];
+          ld[p + 3] = lum >= 235 ? 0 : Math.min(255, Math.round((235 - lum) * 255 / 175));
+        }
+        for (i = 0; i < GAP_CLOSE; i++) { wall = thicken(wall, W, H); }
+
+        // Label enclosed areas
+        var label = new Int32Array(N).fill(-1);
+        var stack = new Int32Array(N);
+        var areas = [];
+        var s, top, x, area, n = 0;
+        for (s = 0; s < N; s++) {
+          if (wall[s] || label[s] !== -1) { continue; }
+          top = 0;
+          stack[top++] = s;
+          label[s] = n;
+          area = 0;
+          while (top) {
+            i = stack[--top];
+            area++;
+            x = i % W;
+            if (x > 0 && !wall[i - 1] && label[i - 1] === -1) { label[i - 1] = n; stack[top++] = i - 1; }
+            if (x < W - 1 && !wall[i + 1] && label[i + 1] === -1) { label[i + 1] = n; stack[top++] = i + 1; }
+            if (i >= W && !wall[i - W] && label[i - W] === -1) { label[i - W] = n; stack[top++] = i - W; }
+            if (i < N - W && !wall[i + W] && label[i + W] === -1) { label[i + W] = n; stack[top++] = i + W; }
+          }
+          areas.push(area);
+          n++;
+        }
+
+        // Drop specks, renumbering the areas that are kept
+        var remap = new Int32Array(n);
+        var R = 0;
+        for (s = 0; s < n; s++) { remap[s] = areas[s] >= MIN_AREA ? R++ : -1; }
+        if (R === 0) {
+          label.fill(0);
+          R = 1;
+        } else {
+          for (i = 0; i < N; i++) {
+            if (label[i] >= 0) { label[i] = remap[label[i]]; }
+          }
+          // Hand outline and speck pixels to the nearest area
+          var head = 0, tail = 0;
+          for (i = 0; i < N; i++) {
+            if (label[i] < 0) { continue; }
+            x = i % W;
+            if ((x > 0 && label[i - 1] < 0) || (x < W - 1 && label[i + 1] < 0) ||
+                (i >= W && label[i - W] < 0) || (i < N - W && label[i + W] < 0)) {
+              stack[tail++] = i;
+            }
+          }
+          while (head < tail) {
+            i = stack[head++];
+            s = label[i];
+            x = i % W;
+            if (x > 0 && label[i - 1] < 0) { label[i - 1] = s; stack[tail++] = i - 1; }
+            if (x < W - 1 && label[i + 1] < 0) { label[i + 1] = s; stack[tail++] = i + 1; }
+            if (i >= W && label[i - W] < 0) { label[i - W] = s; stack[tail++] = i - W; }
+            if (i < N - W && label[i + W] < 0) { label[i + W] = s; stack[tail++] = i + W; }
+          }
+        }
+
+        // Pixel list and bounding box per area
+        var start = new Int32Array(R + 1);
+        for (i = 0; i < N; i++) { start[label[i] + 1]++; }
+        for (s = 0; s < R; s++) { start[s + 1] += start[s]; }
+        var fillPos = start.slice(0, R);
+        var pixels = new Int32Array(N);
+        var boxes = new Int32Array(R * 4);
+        for (s = 0; s < R; s++) { boxes[s * 4] = W; boxes[s * 4 + 1] = H; boxes[s * 4 + 2] = -1; boxes[s * 4 + 3] = -1; }
+        var y, b;
+        for (i = 0; i < N; i++) {
+          s = label[i];
+          pixels[fillPos[s]++] = i;
+          x = i % W;
+          y = (i - x) / W;
+          b = s * 4;
+          if (x < boxes[b]) { boxes[b] = x; }
+          if (y < boxes[b + 1]) { boxes[b + 1] = y; }
+          if (x > boxes[b + 2]) { boxes[b + 2] = x; }
+          if (y > boxes[b + 3]) { boxes[b + 3] = y; }
+        }
+
+        return { W: W, H: H, R: R, label: label, start: start, pixels: pixels, boxes: boxes, lines: lines };
+      }
+
+      // ---------- Painting ----------
+
+      function paintArea(a) {
+        var c = colours[a];
+        var r = c >> 16, g = (c >> 8) & 255, bl = c & 255;
+        var d = fillData.data, px = page.pixels;
+        for (var k = page.start[a], end = page.start[a + 1]; k < end; k++) {
+          var p = px[k] * 4;
+          d[p] = r;
+          d[p + 1] = g;
+          d[p + 2] = bl;
+          d[p + 3] = 255;
+        }
+      }
+
+      function areaBox(a) {
+        var b = a * 4, bx = page.boxes;
+        return { x: bx[b], y: bx[b + 1], w: bx[b + 2] - bx[b] + 1, h: bx[b + 3] - bx[b + 1] + 1 };
+      }
+
+      function showArea(a) {
+        var r = areaBox(a);
+        fillCtx.putImageData(fillData, 0, 0, r.x, r.y, r.w, r.h);
+      }
+
+      function paintAll() {
+        for (var a = 0; a < page.R; a++) { paintArea(a); }
+        fillCtx.putImageData(fillData, 0, 0);
+      }
+
+      function finishAnimation() {
+        if (animation) { animation.finish(); }
+      }
+
+      // The new colour spreads out in a circle from where the picture was tapped
+      function revealArea(a, cx, cy) {
+        finishAnimation();
+        var r = areaBox(a);
+        if (reduceMotion || r.w * r.h < 4000) {
+          showArea(a);
+          return;
+        }
+        var snapshot = document.createElement('canvas');
+        snapshot.width = r.w;
+        snapshot.height = r.h;
+        snapshot.getContext('2d').putImageData(fillData, -r.x, -r.y, r.x, r.y, r.w, r.h);
+        var reach = Math.sqrt(Math.pow(Math.max(cx - r.x, r.x + r.w - cx), 2) + Math.pow(Math.max(cy - r.y, r.y + r.h - cy), 2));
+        var began = null, frame = 0;
+        var current = {
+          finish: function () {
+            cancelAnimationFrame(frame);
+            showArea(a);
+            if (animation === current) { animation = null; }
+          }
+        };
+        function step(now) {
+          if (began === null) { began = now; }
+          var t = Math.min(1, (now - began) / 320);
+          var eased = 1 - Math.pow(1 - t, 3);
+          fillCtx.save();
+          fillCtx.beginPath();
+          fillCtx.arc(cx, cy, reach * eased + 2, 0, Math.PI * 2);
+          fillCtx.clip();
+          fillCtx.drawImage(snapshot, r.x, r.y);
+          fillCtx.restore();
+          if (t < 1) { frame = requestAnimationFrame(step); } else { current.finish(); }
+        }
+        animation = current;
+        frame = requestAnimationFrame(step);
+      }
+
+      function fillAt(x, y) {
+        var a = page.label[y * page.W + x];
+        if (colours[a] === currentColour) { return; }
+        finishAnimation();
+        pushUndo([[a, colours[a]]]);
+        colours[a] = currentColour;
+        paintArea(a);
+        revealArea(a, x, y);
+        scheduleSave();
+      }
+
+      function pushUndo(changes) {
+        undoStack.push(changes);
+        if (undoStack.length > MAX_UNDO) { undoStack.shift(); }
+        undoBtn.disabled = false;
+      }
+
+      function undo() {
+        if (!page || !undoStack.length) { return; }
+        finishAnimation();
+        var changes = undoStack.pop();
+        for (var k = changes.length - 1; k >= 0; k--) { colours[changes[k][0]] = changes[k][1]; }
+        if (changes.length > 30) {
+          paintAll();
+        } else {
+          changes.forEach(function (ch) { paintArea(ch[0]); showArea(ch[0]); });
+        }
+        undoBtn.disabled = !undoStack.length;
+        scheduleSave();
+      }
+
+      // Undoable, so no "are you sure?" needed
+      function startOver() {
+        if (!page) { return; }
+        finishAnimation();
+        var changes = [];
+        for (var a = 0; a < page.R; a++) {
+          if (colours[a] !== WHITE) {
+            changes.push([a, colours[a]]);
+            colours[a] = WHITE;
+          }
+        }
+        if (!changes.length) { return; }
+        pushUndo(changes);
+        paintAll();
+        scheduleSave();
+      }
+
+      // ---------- Saving progress on this device ----------
+
+      function storeKey(p) { return STORE_PREFIX + p.id; }
+
+      function signature() { return page.W + 'x' + page.H + ':' + page.R; }
+
+      function save() {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        if (!page) { return; }
+        var list = [];
+        for (var a = 0; a < page.R; a++) {
+          if (colours[a] !== WHITE) { list.push(a, colours[a]); }
+        }
+        try {
+          if (list.length) {
+            localStorage.setItem(storeKey(pic), JSON.stringify({ sig: signature(), c: list }));
+          } else {
+            localStorage.removeItem(storeKey(pic));
+          }
+        } catch (e) { /* storage unavailable: colouring still works, it just isn't remembered */ }
+      }
+
+      function scheduleSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(save, 400);
+      }
+
+      function restore() {
+        try {
+          var saved = JSON.parse(localStorage.getItem(storeKey(pic)));
+          if (!saved || saved.sig !== signature()) { return; }
+          for (var k = 0; k + 1 < saved.c.length; k += 2) {
+            if (saved.c[k] >= 0 && saved.c[k] < page.R) { colours[saved.c[k]] = saved.c[k + 1]; }
+          }
+        } catch (e) { /* nothing saved, or storage unavailable */ }
+      }
+
+      function hasProgress(p) {
+        try { return !!localStorage.getItem(storeKey(p)); } catch (e) { return false; }
+      }
+
+      // ---------- Screens ----------
+
+      function renderPicker() {
+        grid.innerHTML = '';
+        PICTURES.forEach(function (p) {
+          var card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'picture-card';
+          var thumb = document.createElement('span');
+          thumb.className = 'thumb';
+          var img = document.createElement('img');
+          img.src = p.src;
+          img.alt = '';
+          thumb.appendChild(img);
+          var label = document.createElement('span');
+          label.className = 'label';
+          label.textContent = p.title;
+          card.appendChild(thumb);
+          card.appendChild(label);
+          if (hasProgress(p)) {
+            var badge = document.createElement('span');
+            badge.className = 'badge';
+            badge.textContent = 'Keep colouring ✏️';
+            card.appendChild(badge);
+          }
+          card.addEventListener('click', function () {
+            cameFromPicker = true;
+            location.hash = p.id;
+          });
+          grid.appendChild(card);
+        });
+      }
+
+      function fitPaper() {
+        if (!page) {
+          paper.style.width = '100%';
+          paper.style.height = '100%';
+          return;
+        }
+        var scale = Math.min(stage.clientWidth / page.W, stage.clientHeight / page.H);
+        paper.style.width = Math.floor(page.W * scale) + 'px';
+        paper.style.height = Math.floor(page.H * scale) + 'px';
+      }
+
+      function openPicture(p) {
+        if (pic === p) { return; }
+        if (pic) { closePicture(); }
+        pic = p;
+        page = null;
+        undoStack = [];
+        undoBtn.disabled = true;
+        topTitle.textContent = p.title;
+        lineCanvas.setAttribute('aria-label', 'Colouring picture: ' + p.title);
+        document.title = p.title + ' — Colouring Corner';
+        picker.hidden = true;
+        studio.hidden = false;
+        document.body.classList.add('is-colouring');
+        loading.textContent = 'Getting the crayons ready…';
+        loading.hidden = false;
+        fitPaper();
+
+        var token = ++openToken;
+        loadPicture(p).then(function (loaded) {
+          // Let the loading message paint before the heavy lifting
+          return new Promise(function (resolve) { setTimeout(resolve, 30); }).then(function () {
+            return preparePage(loaded.img, loaded.W, loaded.H);
+          });
+        }).then(function (prepared) {
+          if (token !== openToken) { return; }
+          page = prepared;
+          fillCanvas.width = lineCanvas.width = page.W;
+          fillCanvas.height = lineCanvas.height = page.H;
+          lineCtx.putImageData(page.lines, 0, 0);
+          page.lines = null;
+          fillData = fillCtx.createImageData(page.W, page.H);
+          colours = new Int32Array(page.R).fill(WHITE);
+          restore();
+          paintAll();
+          fitPaper();
+          loading.hidden = true;
+        }).catch(function () {
+          if (token !== openToken) { return; }
+          loading.textContent = 'Oh no! That picture wouldn’t load. Try another one.';
+        });
+      }
+
+      function closePicture() {
+        finishAnimation();
+        save();
+        openToken++;
+        pic = null;
+        page = null;
+        colours = null;
+        fillData = null;
+        undoStack = [];
+        studio.hidden = true;
+        picker.hidden = false;
+        document.body.classList.remove('is-colouring');
+        topTitle.textContent = 'Colouring Corner';
+        document.title = 'Colouring Corner — Sheepy Games';
+        renderPicker();
+      }
+
+      function route() {
+        var id = decodeURIComponent(location.hash.slice(1));
+        var match = null;
+        PICTURES.forEach(function (p) { if (p.id === id) { match = p; } });
+        if (match) {
+          openPicture(match);
+        } else if (pic) {
+          closePicture();
+        }
+      }
+
+      // ---------- Printing ----------
+
+      function composite(withColours) {
+        var c = document.createElement('canvas');
+        c.width = page.W;
+        c.height = page.H;
+        var ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, page.W, page.H);
+        if (withColours) { ctx.drawImage(fillCanvas, 0, 0); }
+        ctx.drawImage(lineCanvas, 0, 0);
+        return c.toDataURL('image/png');
+      }
+
+      // Both versions are prepared when the chooser opens, so print() can run straight from the tap
+      function openPrintDialog() {
+        if (!page) { return; }
+        finishAnimation();
+        document.getElementById('printColoured').src = composite(true);
+        document.getElementById('printBlank').src = composite(false);
+        document.getElementById('printCaption').textContent = pic.title + ' · sheepygames.io';
+        printDialog.hidden = false;
+      }
+
+      function closePrintDialog() { printDialog.hidden = true; }
+
+      // ---------- Wiring ----------
+
+      COLOURS.forEach(function (c, i) {
+        var sw = document.createElement('button');
+        sw.type = 'button';
+        sw.className = 'swatch' + (c[0] === '#FFFFFF' ? ' is-white' : '');
+        sw.style.backgroundColor = c[0];
+        sw.setAttribute('aria-label', c[1]);
+        sw.setAttribute('aria-pressed', i === 7 ? 'true' : 'false');
+        sw.addEventListener('click', function () {
+          currentColour = parseInt(c[0].slice(1), 16);
+          Array.prototype.forEach.call(palette.children, function (other) {
+            other.setAttribute('aria-pressed', other === sw ? 'true' : 'false');
+          });
+        });
+        palette.appendChild(sw);
+      });
+
+      lineCanvas.addEventListener('pointerdown', function (e) {
+        if (!page || !e.isPrimary || e.button > 0) { return; }
+        e.preventDefault();
+        var rect = lineCanvas.getBoundingClientRect();
+        var x = Math.floor((e.clientX - rect.left) / rect.width * page.W);
+        var y = Math.floor((e.clientY - rect.top) / rect.height * page.H);
+        if (x < 0 || y < 0 || x >= page.W || y >= page.H) { return; }
+        fillAt(x, y);
+      });
+
+      undoBtn.addEventListener('click', undo);
+      document.getElementById('clearBtn').addEventListener('click', startOver);
+      document.getElementById('printBtn').addEventListener('click', openPrintDialog);
+      document.getElementById('printCancel').addEventListener('click', closePrintDialog);
+
+      Array.prototype.forEach.call(printDialog.querySelectorAll('[data-print]'), function (btn) {
+        btn.addEventListener('click', function () {
+          printSheet.setAttribute('data-mode', btn.getAttribute('data-print'));
+          closePrintDialog();
+          window.print();
+        });
+      });
+
+      printDialog.addEventListener('click', function (e) {
+        if (e.target === printDialog) { closePrintDialog(); }
+      });
+
+      document.getElementById('pickerBtn').addEventListener('click', function () {
+        if (cameFromPicker) {
+          history.back();
+        } else {
+          history.replaceState(null, '', location.pathname + location.search);
+          route();
+        }
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !printDialog.hidden) { closePrintDialog(); }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && page) {
+          e.preventDefault();
+          undo();
+        }
+      });
+
+      if (window.ResizeObserver) {
+        new ResizeObserver(fitPaper).observe(stage);
+      } else {
+        window.addEventListener('resize', fitPaper);
+      }
+
+      window.addEventListener('pagehide', save);
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden') { save(); }
+      });
+      window.addEventListener('hashchange', route);
+
+      renderPicker();
+      route();
+    })();
+  </script>
+
+</body>
+</html>

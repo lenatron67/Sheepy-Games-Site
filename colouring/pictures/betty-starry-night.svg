@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="800" height="1000">
+  <defs>
+    <path id="body" d="M400,235 C565,235 668,410 668,610 C668,775 575,868 400,868 C225,868 132,775 132,610 C132,410 235,235 400,235 Z"/>
+    <clipPath id="inBody"><use href="#body"/></clipPath>
+  </defs>
+  <rect width="800" height="1000" fill="#fff"/>
+  <g fill="#fff" stroke="#000" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- Night sky: moon and stars -->
+    <path d="M655,95 A70,70 0 1 0 725,195 A55,55 0 1 1 655,95 Z" transform="translate(40,-45)"/>
+    <path d="M110,110 l14,30 32,4 -24,22 7,32 -29,-16 -29,16 7,-32 -24,-22 32,-4 Z"/>
+    <path d="M560,60 l9,19 20,3 -15,14 4,20 -18,-10 -18,10 4,-20 -15,-14 20,-3 Z" transform="translate(-150,-15)"/>
+    <path d="M60,390 l9,19 20,3 -15,14 4,20 -18,-10 -18,10 4,-20 -15,-14 20,-3 Z"/>
+
+    <!-- Wings (behind the body) -->
+    <path d="M165,520 C120,470 70,450 22,468 C42,515 40,560 52,612 C78,592 106,598 118,628 C130,610 148,610 162,626 Z"/>
+    <path d="M635,520 C680,470 730,450 778,468 C758,515 760,560 748,612 C722,592 694,598 682,628 C670,610 652,610 638,626 Z"/>
+    <path d="M60,500 C90,520 120,560 125,610" fill="none" stroke-width="7"/>
+    <path d="M740,500 C710,520 680,560 675,610" fill="none" stroke-width="7"/>
+
+    <!-- Ears (behind the body) -->
+    <path d="M245,345 C220,260 196,170 212,110 C275,135 340,195 368,262 Z"/>
+    <path d="M555,345 C580,260 604,170 588,110 C525,135 460,195 432,262 Z"/>
+    <path d="M254,300 C240,240 228,185 234,150 C272,172 310,210 330,252 Z" stroke-width="7"/>
+    <path d="M546,300 C560,240 572,185 566,150 C528,172 490,210 470,252 Z" stroke-width="7"/>
+
+    <!-- Body -->
+    <use href="#body"/>
+
+    <!-- Fluffy belly with tie-dye spots -->
+    <g clip-path="url(#inBody)">
+      <path d="M110,930 L110,820 C160,750 230,705 300,690 C330,670 360,700 400,682 C440,700 470,670 500,690 C570,705 640,750 690,820 L690,930 Z"/>
+      <ellipse cx="285" cy="785" rx="46" ry="30" transform="rotate(-15 285 785)" stroke-width="7"/>
+      <ellipse cx="470" cy="760" rx="44" ry="28" transform="rotate(10 470 760)" stroke-width="7"/>
+      <ellipse cx="385" cy="828" rx="34" ry="18" transform="rotate(-5 385 828)" stroke-width="7"/>
+    </g>
+    <use href="#body" fill="none"/>
+
+    <!-- Face -->
+    <ellipse cx="302" cy="548" rx="27" ry="30" fill="#000"/>
+    <ellipse cx="498" cy="548" rx="27" ry="30" fill="#000"/>
+    <circle cx="312" cy="537" r="8" fill="#fff" stroke="none"/>
+    <circle cx="508" cy="537" r="8" fill="#fff" stroke="none"/>
+    <path d="M362,585 Q400,618 438,585" fill="none" stroke-width="8"/>
+    <path d="M372,594 L381,618 L390,601 Z" stroke-width="5"/>
+    <path d="M428,594 L419,618 L410,601 Z" stroke-width="5"/>
+  </g>
+</svg>
