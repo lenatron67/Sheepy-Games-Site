@@ -6,7 +6,7 @@
   <title>Colouring Corner — Sheepy Games</title>
   <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta name="description" content="Colour in Sheepy and friends: pick a colour, tap to fill, then print your picture.">
+  <meta name="description" content="Colour in Sheepy and friends: tap to fill or paint with crayons, glitter and rainbows, then print your picture.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
@@ -131,7 +131,8 @@
       aspect-ratio: 4 / 3;
     }
 
-    .picture-card .thumb img {
+    .picture-card .thumb img,
+    .picture-card .thumb svg {
       position: absolute;
       inset: 14px;
       width: calc(100% - 28px);
@@ -197,6 +198,7 @@
     }
 
     #lineCanvas { touch-action: none; cursor: pointer; }
+    .paper.is-brush #lineCanvas { cursor: crosshair; }
 
     .loading {
       position: absolute;
@@ -230,6 +232,94 @@
       border-radius: 18px;
       box-shadow: 0 6px 16px var(--shadow-color);
     }
+
+    /* Fill, brushes, sizes */
+    .tools {
+      display: grid;
+      gap: 8px;
+      background: white;
+      padding: 10px;
+      border-radius: 18px;
+      box-shadow: 0 6px 16px var(--shadow-color);
+    }
+
+    .tool-list, .sizes {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+    }
+
+    .sizes { grid-template-columns: repeat(3, 1fr); }
+
+    .tool, .size {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: 3px solid #E7DFD3;
+      border-radius: 14px;
+      padding: 0;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .tool { aspect-ratio: 1; }
+    .tool canvas, .tool svg { width: 86%; height: 86%; display: block; pointer-events: none; }
+    .size { height: 40px; }
+    .size span { display: block; border-radius: 50%; background: var(--text-color); }
+    .paint-fill { fill: var(--paint, #81D4FA); }
+
+    .tool:hover, .size:hover:not(:disabled) { border-color: var(--bright-orange); }
+
+    .tool[aria-pressed="true"], .size[aria-pressed="true"] {
+      border-color: var(--bright-orange);
+      background: #FFF1E2;
+      transform: scale(1.06);
+    }
+
+    .size:disabled { opacity: 0.35; cursor: default; }
+
+    .inside-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: none;
+      border: none;
+      color: var(--text-color);
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 2px 4px;
+      cursor: pointer;
+    }
+
+    .inside-toggle:disabled { opacity: 0.35; cursor: default; }
+
+    .switch {
+      position: relative;
+      flex-shrink: 0;
+      width: 44px;
+      height: 26px;
+      border-radius: 13px;
+      background: #D8D8D8;
+      transition: background-color 0.2s ease;
+    }
+
+    .switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      transition: transform 0.2s ease;
+    }
+
+    .inside-toggle[aria-pressed="true"] .switch { background: var(--grass-green); }
+    .inside-toggle[aria-pressed="true"] .switch::after { transform: translateX(18px); }
 
     .swatch {
       aspect-ratio: 1;
@@ -284,6 +374,17 @@
     @media (max-aspect-ratio: 1/1) {
       .studio { flex-direction: column; }
       .toolbar { width: auto; overflow: visible; }
+      .tools {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 10px 16px;
+        padding: 8px 10px;
+      }
+      .tool-list { grid-template-columns: repeat(7, 46px); gap: 6px; }
+      .sizes { grid-template-columns: repeat(3, 40px); gap: 6px; }
+      .size { height: 46px; }
       .palette {
         grid-template-columns: repeat(10, minmax(0, 52px));
         justify-content: center;
@@ -391,7 +492,7 @@
     <!-- Picture picker -->
     <section class="picker" id="picker">
       <h1>Colouring Corner &#127912;</h1>
-      <p>Pick a picture, choose a colour, and tap to fill it in!</p>
+      <p>Pick a picture, then tap to fill it in or paint with crayons, glitter and rainbows!</p>
       <div class="picture-grid" id="pictureGrid"></div>
     </section>
 
@@ -400,11 +501,17 @@
       <div class="stage" id="stage">
         <div class="paper" id="paper">
           <canvas id="fillCanvas"></canvas>
+          <canvas id="paintCanvas"></canvas>
           <canvas id="lineCanvas" role="img"></canvas>
           <div class="loading" id="loading">Getting the crayons ready&hellip;</div>
         </div>
       </div>
       <div class="toolbar">
+        <div class="tools">
+          <div class="tool-list" id="toolList" role="group" aria-label="Tools"></div>
+          <div class="sizes" id="sizes" role="group" aria-label="Brush size"></div>
+          <button class="inside-toggle" id="insideBtn" type="button" aria-pressed="true">Stay in the lines <span class="switch" aria-hidden="true"></span></button>
+        </div>
         <div class="palette" id="palette" role="group" aria-label="Colours"></div>
         <div class="actions">
           <button class="action" id="undoBtn" type="button">&#8630; Undo</button>
@@ -440,8 +547,17 @@
       // Add a picture: drop black-on-white line art (SVG or PNG) into pictures/ and list it here.
       var PICTURES = [
         { id: 'betty-starry-night', title: "Betty's Starry Night", src: 'pictures/betty-starry-night.svg' },
-        { id: 'sheepy-and-blankie-asleep', title: 'Sheepy & Blankie Fast Asleep', src: 'pictures/sheepy-and-blankie-asleep.png' }
+        { id: 'sheepy-and-blankie-asleep', title: 'Sheepy & Blankie Fast Asleep', src: 'pictures/sheepy-and-blankie-asleep.png' },
+        { id: 'blank-page', title: 'Draw Your Own', blank: true }
       ];
+
+      var TOOLS = [
+        ['fill', 'Fill'], ['marker', 'Marker'], ['crayon', 'Crayon'], ['glitter', 'Glitter'],
+        ['metallic', 'Shiny metal'], ['rainbow', 'Rainbow'], ['eraser', 'Eraser']
+      ];
+
+      // Brush widths as a share of the picture's long side, and the size of the dot on each button
+      var SIZES = [['Thin', 0.012, 8], ['Medium', 0.026, 14], ['Thick', 0.05, 22]];
 
       var COLOURS = [
         ['#E53935', 'Red'], ['#FB8C00', 'Orange'], ['#FDD835', 'Yellow'], ['#FFF59D', 'Lemon'],
@@ -458,7 +574,11 @@
       var WHITE = 0xFFFFFF;
       var LINE_RGB = [25, 25, 25];
       var STORE_PREFIX = 'sheepyColouring:v1:';
+      var INSIDE_KEY = 'sheepyColouring:stayInside';
       var MAX_UNDO = 100;
+      var MAX_UNDO_BYTES = 64 * 1024 * 1024;   // brush undo keeps the pixels under each stroke, so it's capped by memory too
+      var BLANK_W = 1400, BLANK_H = 1050;
+      var RAINBOW_SPIN = 360 / 450;            // degrees of hue per pixel of rainbow stroke
 
       var picker = document.getElementById('picker');
       var grid = document.getElementById('pictureGrid');
@@ -466,16 +586,32 @@
       var stage = document.getElementById('stage');
       var paper = document.getElementById('paper');
       var fillCanvas = document.getElementById('fillCanvas');
+      var paintCanvas = document.getElementById('paintCanvas');
       var lineCanvas = document.getElementById('lineCanvas');
       var loading = document.getElementById('loading');
       var palette = document.getElementById('palette');
+      var toolList = document.getElementById('toolList');
+      var sizesBox = document.getElementById('sizes');
+      var insideBtn = document.getElementById('insideBtn');
       var undoBtn = document.getElementById('undoBtn');
       var topTitle = document.getElementById('topTitle');
       var printDialog = document.getElementById('printDialog');
       var printSheet = document.getElementById('printSheet');
 
       var fillCtx = fillCanvas.getContext('2d');
+      var paintCtx = paintCanvas.getContext('2d');
       var lineCtx = lineCanvas.getContext('2d');
+
+      // Off-screen layers for brush strokes: the stroke being drawn, the paint as it was before it,
+      // the shape of the area it must stay inside, and a CPU-side copy for reading pixels back
+      var wetCanvas = document.createElement('canvas');
+      var beforeCanvas = document.createElement('canvas');
+      var maskCanvas = document.createElement('canvas');
+      var snapCanvas = document.createElement('canvas');
+      var wetCtx = wetCanvas.getContext('2d');
+      var beforeCtx = beforeCanvas.getContext('2d');
+      var maskCtx = maskCanvas.getContext('2d');
+      var snapCtx = snapCanvas.getContext('2d', { willReadFrequently: true });
 
       var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -489,6 +625,19 @@
       var saveTimer = null;
       var animation = null;
       var cameFromPicker = false;
+      var tool = 'fill';
+      var sizeIndex = 1;
+      var stayInside = true;
+      var stroke = null;       // brush stroke in progress
+      var drawFrame = 0;
+      var maskArea = -1;       // area whose shape is in maskCanvas
+      var hasPaint = false;    // the brush layer has something on it
+      var paintChanged = false;
+      var paintSaveSeq = {};   // per picture, so a slow save can't land after a newer one
+      var undoBytes = 0;
+      var lastPenTime = 0;
+
+      try { stayInside = localStorage.getItem(INSIDE_KEY) !== '0'; } catch (e) { /* keep the default */ }
 
       // ---------- Loading and preparing a picture ----------
 
@@ -508,6 +657,9 @@
 
       // SVGs are re-sized before drawing so they rasterise sharply at the working size (Safari otherwise scales a small bitmap)
       function loadPicture(p) {
+        if (p.blank) {
+          return Promise.resolve({ img: document.createElement('canvas'), W: BLANK_W, H: BLANK_H });
+        }
         if (!/\.svg$/i.test(p.src)) {
           return loadImage(p.src).then(function (img) {
             var size = fitSize(img.naturalWidth, img.naturalHeight);
@@ -732,28 +884,45 @@
         var a = page.label[y * page.W + x];
         if (colours[a] === currentColour) { return; }
         finishAnimation();
-        pushUndo([[a, colours[a]]]);
+        pushUndo({ fills: [[a, colours[a]]] });
         colours[a] = currentColour;
         paintArea(a);
         revealArea(a, x, y);
         scheduleSave();
       }
 
-      function pushUndo(changes) {
-        undoStack.push(changes);
-        if (undoStack.length > MAX_UNDO) { undoStack.shift(); }
+      // An undo step holds fill changes as [area, old colour] pairs, a patch of the brush layer, or both
+      function pushUndo(entry) {
+        entry.bytes = entry.paint ? entry.paint.data.data.length : 0;
+        undoStack.push(entry);
+        undoBytes += entry.bytes;
+        while (undoStack.length > 1 && (undoStack.length > MAX_UNDO || undoBytes > MAX_UNDO_BYTES)) {
+          undoBytes -= undoStack.shift().bytes;
+        }
         undoBtn.disabled = false;
       }
 
       function undo() {
-        if (!page || !undoStack.length) { return; }
+        if (!page) { return; }
+        // Undo while a finger is still painting just drops that stroke
+        if (stroke) {
+          endStroke(false);
+          return;
+        }
+        if (!undoStack.length) { return; }
         finishAnimation();
-        var changes = undoStack.pop();
+        var entry = undoStack.pop();
+        undoBytes -= entry.bytes;
+        var changes = entry.fills || [];
         for (var k = changes.length - 1; k >= 0; k--) { colours[changes[k][0]] = changes[k][1]; }
         if (changes.length > 30) {
           paintAll();
         } else {
           changes.forEach(function (ch) { paintArea(ch[0]); showArea(ch[0]); });
+        }
+        if (entry.paint) {
+          paintCtx.putImageData(entry.paint.data, entry.paint.x, entry.paint.y);
+          paintChanged = true;
         }
         undoBtn.disabled = !undoStack.length;
         scheduleSave();
@@ -762,6 +931,7 @@
       // Undoable, so no "are you sure?" needed
       function startOver() {
         if (!page) { return; }
+        endStroke(true);
         finishAnimation();
         var changes = [];
         for (var a = 0; a < page.R; a++) {
@@ -770,10 +940,342 @@
             colours[a] = WHITE;
           }
         }
-        if (!changes.length) { return; }
-        pushUndo(changes);
+        var paint = paintSnapshot();
+        if (!changes.length && !paint) { return; }
+        pushUndo({ fills: changes, paint: paint });
         paintAll();
+        if (paint) {
+          paintCtx.clearRect(0, 0, page.W, page.H);
+          paintChanged = true;
+        }
         scheduleSave();
+      }
+
+      // ---------- Brushes ----------
+
+      function mixRgb(c, amount) {
+        var to = amount > 0 ? 255 : 0, t = Math.abs(amount);
+        return [c >> 16, (c >> 8) & 255, c & 255].map(function (v) { return Math.round(v + (to - v) * t); });
+      }
+
+      // Colour c mixed towards white (amount > 0) or black (amount < 0), as CSS
+      function shade(c, amount) { return 'rgb(' + mixRgb(c, amount).join(',') + ')'; }
+
+      function hueOf(c) {
+        var r = (c >> 16) / 255, g = ((c >> 8) & 255) / 255, b = (c & 255) / 255;
+        var max = Math.max(r, g, b), d = max - Math.min(r, g, b);
+        if (!d) { return 0; }
+        var h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+        return (h * 60 + 360) % 360;
+      }
+
+      // Paper grain that crayon is rubbed through. It's fixed to the page, so strokes share the same grain.
+      var grainTile = (function () {
+        var T = 128, noise = new Float32Array(T * T), c = document.createElement('canvas');
+        c.width = c.height = T;
+        var ctx = c.getContext('2d'), img = ctx.createImageData(T, T), x, y, dx, dy, sum;
+        for (x = 0; x < noise.length; x++) { noise[x] = Math.random(); }
+        for (y = 0; y < T; y++) {
+          for (x = 0; x < T; x++) {
+            sum = 0;
+            for (dy = -1; dy <= 1; dy++) {
+              for (dx = -1; dx <= 1; dx++) { sum += noise[((y + dy + T) % T) * T + (x + dx + T) % T]; }
+            }
+            img.data[(y * T + x) * 4 + 3] = Math.round(255 * Math.max(0, Math.min(1, (sum / 9 - 0.36) / 0.12)));
+          }
+        }
+        ctx.putImageData(img, 0, 0);
+        return c;
+      })();
+
+      // Diagonal light and dark bands that make metallic strokes shine
+      var sheenTiles = {};
+      function sheenTile(c) {
+        if (sheenTiles[c]) { return sheenTiles[c]; }
+        var T = 96, tile = document.createElement('canvas');
+        tile.width = tile.height = T;
+        var ctx = tile.getContext('2d'), img = ctx.createImageData(T, T), d = img.data;
+        var dark = mixRgb(c, -0.3), light = mixRgb(c, 0.7), x, y, s, p;
+        for (y = 0; y < T; y++) {
+          for (x = 0; x < T; x++) {
+            s = Math.pow(0.5 + 0.5 * Math.cos(2 * Math.PI * ((x + y) % T) / T), 2);
+            p = (y * T + x) * 4;
+            d[p] = dark[0] + (light[0] - dark[0]) * s;
+            d[p + 1] = dark[1] + (light[1] - dark[1]) * s;
+            d[p + 2] = dark[2] + (light[2] - dark[2]) * s;
+            d[p + 3] = 255;
+          }
+        }
+        ctx.putImageData(img, 0, 0);
+        sheenTiles[c] = tile;
+        return tile;
+      }
+
+      // Traces the stroke's points as one smooth line
+      function tracePath(ctx, pts) {
+        var n = pts.length;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        if (n === 1) {
+          ctx.lineTo(pts[0].x + 0.01, pts[0].y);
+          return;
+        }
+        for (var i = 1; i < n - 1; i++) {
+          ctx.quadraticCurveTo(pts[i].x, pts[i].y, (pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2);
+        }
+        ctx.lineTo(pts[n - 1].x, pts[n - 1].y);
+      }
+
+      function strokeLine(ctx, s, width, style) {
+        ctx.lineWidth = width;
+        ctx.strokeStyle = style;
+        tracePath(ctx, s.pts);
+        ctx.stroke();
+      }
+
+      function starPath(ctx, x, y, r) {
+        ctx.moveTo(x, y - r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.quadraticCurveTo(x, y, x, y + r);
+        ctx.quadraticCurveTo(x, y, x - r, y);
+        ctx.quadraticCurveTo(x, y, x, y - r);
+      }
+
+      // Each brush draws a whole stroke; box is the region it may touch
+      var BRUSHES = {
+        marker: function (ctx, s) {
+          strokeLine(ctx, s, s.width, shade(s.colour, 0));
+        },
+        eraser: function (ctx, s) {
+          strokeLine(ctx, s, s.width, '#000');
+        },
+        crayon: function (ctx, s, box) {
+          strokeLine(ctx, s, s.width, shade(s.colour, 0));
+          ctx.globalCompositeOperation = 'destination-in';
+          ctx.fillStyle = ctx.createPattern(grainTile, 'repeat');
+          ctx.fillRect(box.x, box.y, box.w, box.h);
+          ctx.globalCompositeOperation = 'source-over';
+        },
+        metallic: function (ctx, s) {
+          strokeLine(ctx, s, s.width, shade(s.colour, -0.45));
+          strokeLine(ctx, s, s.width * 0.74, ctx.createPattern(sheenTile(s.colour), 'repeat'));
+          strokeLine(ctx, s, Math.max(1.5, s.width * 0.14), 'rgba(255,255,255,0.75)');
+        },
+        glitter: function (ctx, s) {
+          var g = s.glitter, b, k, list;
+          strokeLine(ctx, s, s.width, g.base);
+          for (b = 0; b < g.specks.length; b++) {
+            list = g.specks[b];
+            ctx.fillStyle = g.shades[b];
+            ctx.beginPath();
+            for (k = 0; k < list.length; k += 3) {
+              ctx.rect(list[k] - list[k + 2] / 2, list[k + 1] - list[k + 2] / 2, list[k + 2], list[k + 2]);
+            }
+            ctx.fill();
+          }
+          ctx.fillStyle = 'rgba(255,255,255,0.95)';
+          ctx.beginPath();
+          for (k = 0; k < g.stars.length; k += 3) { starPath(ctx, g.stars[k], g.stars[k + 1], g.stars[k + 2]); }
+          ctx.fill();
+        },
+        // Close-set dots whose hue drifts along the stroke, starting from the chosen colour.
+        // Dots already down never change, so only the new ones are drawn each frame.
+        rainbow: function (ctx, s) {
+          var dots = s.rainbow.dots, r = s.width / 2, k;
+          for (k = s.rainbow.drawn; k < dots.length; k += 3) {
+            ctx.fillStyle = 'hsl(' + dots[k + 2] + ',95%,55%)';
+            ctx.beginPath();
+            ctx.arc(dots[k], dots[k + 1], r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          s.rainbow.drawn = dots.length;
+        }
+      };
+
+      function newStroke(kind, colour, width, spin) {
+        var s = { tool: kind, colour: colour, width: width, pts: [] };
+        if (kind === 'rainbow') {
+          s.incremental = true;
+          s.rainbow = { dots: [], drawn: 0, carry: 0, travelled: 0, hue: hueOf(colour), spin: spin || RAINBOW_SPIN };
+        }
+        if (kind === 'glitter') {
+          s.glitter = {
+            base: shade(colour, -0.15),
+            shades: [shade(colour, 0.25), shade(colour, 0.6), shade(colour, 0), shade(colour, -0.35), '#FFFFFF'],
+            specks: [[], [], [], [], []],
+            stars: [],
+            carry: 0,
+            perDab: Math.max(4, Math.round(width * 0.8))
+          };
+        }
+        return s;
+      }
+
+      // Glitter is scattered once, as the stroke grows, so it doesn't shimmer about while drawing
+      var SPECK_ODDS = [0.28, 0.46, 0.72, 0.94, 1];
+      function sprinkle(s, x, y) {
+        var g = s.glitter, r = s.width / 2, k, b, ang, dist, roll;
+        for (k = 0; k < g.perDab; k++) {
+          ang = Math.random() * Math.PI * 2;
+          dist = r * 0.92 * Math.sqrt(Math.random());
+          roll = Math.random();
+          for (b = 0; roll > SPECK_ODDS[b]; b++) { /* find the shade */ }
+          g.specks[b].push(x + Math.cos(ang) * dist, y + Math.sin(ang) * dist, Math.max(1.2, s.width * (0.04 + Math.random() * 0.07)));
+        }
+        if (Math.random() < 0.16) {
+          ang = Math.random() * Math.PI * 2;
+          dist = r * 0.7 * Math.random();
+          g.stars.push(x + Math.cos(ang) * dist, y + Math.sin(ang) * dist, s.width * (0.18 + Math.random() * 0.22));
+        }
+      }
+
+      function addPoint(s, x, y) {
+        var last = s.pts[s.pts.length - 1];
+        if (last && Math.abs(x - last.x) + Math.abs(y - last.y) < 1.5) { return; }
+        var p = { x: x, y: y };
+        s.pts.push(p);
+        if (!last) {
+          s.x0 = s.x1 = x;
+          s.y0 = s.y1 = y;
+        } else {
+          s.x0 = Math.min(s.x0, x);
+          s.x1 = Math.max(s.x1, x);
+          s.y0 = Math.min(s.y0, y);
+          s.y1 = Math.max(s.y1, y);
+        }
+        var from = last || p, len = Math.sqrt(Math.pow(x - from.x, 2) + Math.pow(y - from.y, 2)), t, f;
+        if (s.glitter) {
+          var g = s.glitter;
+          for (t = g.carry; t <= len; t += s.width * 0.3) {
+            f = len ? t / len : 0;
+            sprinkle(s, from.x + (x - from.x) * f, from.y + (y - from.y) * f);
+          }
+          g.carry = t - len;
+        }
+        if (s.rainbow) {
+          var rb = s.rainbow;
+          for (t = rb.carry; t <= len; t += 1.5) {
+            f = len ? t / len : 0;
+            rb.dots.push(from.x + (x - from.x) * f, from.y + (y - from.y) * f, Math.round((rb.hue + (rb.travelled + t) * rb.spin) % 360));
+          }
+          rb.carry = t - len;
+          rb.travelled += len;
+        }
+      }
+
+      // The part of the page a stroke can touch, with room for glitter stars
+      function strokeRect(s) {
+        var pad = s.width * 0.8 + 2;
+        var x = Math.max(0, Math.floor(s.x0 - pad)), y = Math.max(0, Math.floor(s.y0 - pad));
+        return {
+          x: x,
+          y: y,
+          w: Math.max(1, Math.min(page.W, Math.ceil(s.x1 + pad)) - x),
+          h: Math.max(1, Math.min(page.H, Math.ceil(s.y1 + pad)) - y)
+        };
+      }
+
+      // Puts the shape of one area into maskCanvas, so strokes can be trimmed to it
+      function prepareMask(a) {
+        if (maskArea === a) { return; }
+        var r = areaBox(a), img = maskCtx.createImageData(r.w, r.h), d = img.data;
+        var px = page.pixels, W = page.W, i, k, x;
+        for (k = page.start[a]; k < page.start[a + 1]; k++) {
+          i = px[k];
+          x = i % W;
+          d[(((i - x) / W - r.y) * r.w + x - r.x) * 4 + 3] = 255;
+        }
+        maskCtx.clearRect(0, 0, page.W, page.H);
+        maskCtx.putImageData(img, r.x, r.y);
+        maskArea = a;
+      }
+
+      function brushWidth() {
+        return SIZES[sizeIndex][1] * Math.max(page.W, page.H) * (tool === 'eraser' ? 1.5 : 1);
+      }
+
+      // The paint layer is redrawn as "paint before the stroke" plus the whole stroke so far
+      function drawStroke(s) {
+        var r = strokeRect(s);
+        if (!s.incremental) { wetCtx.clearRect(r.x, r.y, r.w, r.h); }
+        wetCtx.lineCap = wetCtx.lineJoin = 'round';
+        BRUSHES[s.tool](wetCtx, s, r);
+        if (s.area >= 0) {
+          wetCtx.globalCompositeOperation = 'destination-in';
+          wetCtx.drawImage(maskCanvas, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+          wetCtx.globalCompositeOperation = 'source-over';
+        }
+        paintCtx.clearRect(r.x, r.y, r.w, r.h);
+        paintCtx.drawImage(beforeCanvas, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+        paintCtx.globalCompositeOperation = s.tool === 'eraser' ? 'destination-out' : 'source-over';
+        paintCtx.drawImage(wetCanvas, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+        paintCtx.globalCompositeOperation = 'source-over';
+      }
+
+      function requestDraw() {
+        if (drawFrame) { return; }
+        drawFrame = requestAnimationFrame(function () {
+          drawFrame = 0;
+          if (stroke) { drawStroke(stroke); }
+        });
+      }
+
+      function beginStroke(e, p) {
+        var s = newStroke(tool, currentColour, brushWidth());
+        s.pointerId = e.pointerId;
+        s.pointerType = e.pointerType;
+        s.area = stayInside && page.R > 1 ? page.label[Math.floor(p.y) * page.W + Math.floor(p.x)] : -1;
+        if (s.area >= 0) { prepareMask(s.area); }
+        beforeCtx.clearRect(0, 0, page.W, page.H);
+        beforeCtx.drawImage(paintCanvas, 0, 0);
+        wetCtx.clearRect(0, 0, page.W, page.H);
+        addPoint(s, p.x, p.y);
+        stroke = s;
+        requestDraw();
+      }
+
+      // keep: false puts the paint back as it was (a palm that touched down before the pencil)
+      function endStroke(keep) {
+        var s = stroke;
+        if (!s) { return; }
+        stroke = null;
+        cancelAnimationFrame(drawFrame);
+        drawFrame = 0;
+        var r = strokeRect(s);
+        if (!keep) {
+          paintCtx.clearRect(r.x, r.y, r.w, r.h);
+          paintCtx.drawImage(beforeCanvas, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+          return;
+        }
+        drawStroke(s);
+        // Rubbing out a page with no paint on it changes nothing, so it isn't worth an undo step
+        if (s.tool === 'eraser' && !hasPaint) { return; }
+        pushUndo({ paint: grabPatch(beforeCanvas, r) });
+        if (s.tool !== 'eraser') { hasPaint = true; }
+        paintChanged = true;
+        scheduleSave();
+      }
+
+      function grabPatch(source, r) {
+        snapCtx.clearRect(r.x, r.y, r.w, r.h);
+        snapCtx.drawImage(source, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+        return { x: r.x, y: r.y, data: snapCtx.getImageData(r.x, r.y, r.w, r.h) };
+      }
+
+      // A copy of the whole brush layer, or null when nothing is painted
+      function paintSnapshot() {
+        var patch = grabPatch(paintCanvas, { x: 0, y: 0, w: page.W, h: page.H }), d = patch.data.data;
+        for (var i = 3; i < d.length; i += 4) {
+          if (d[i]) { return patch; }
+        }
+        return null;
+      }
+
+      function canvasPoint(e, rect) {
+        return {
+          x: (e.clientX - rect.left) / rect.width * page.W,
+          y: (e.clientY - rect.top) / rect.height * page.H
+        };
       }
 
       // ---------- Saving progress on this device ----------
@@ -782,17 +1284,24 @@
 
       function signature() { return page.W + 'x' + page.H + ':' + page.R; }
 
+      // Fills are a small list in localStorage. Brush paint is a picture, so it goes in IndexedDB,
+      // which has room for it and leaves localStorage free for the other games' saves.
       function save() {
         clearTimeout(saveTimer);
         saveTimer = null;
         if (!page) { return; }
+        if (paintChanged) {
+          paintChanged = false;
+          hasPaint = !!paintSnapshot();
+          savePaint();
+        }
         var list = [];
         for (var a = 0; a < page.R; a++) {
           if (colours[a] !== WHITE) { list.push(a, colours[a]); }
         }
         try {
-          if (list.length) {
-            localStorage.setItem(storeKey(pic), JSON.stringify({ sig: signature(), c: list }));
+          if (list.length || hasPaint) {
+            localStorage.setItem(storeKey(pic), JSON.stringify({ sig: signature(), c: list, p: hasPaint ? 1 : 0 }));
           } else {
             localStorage.removeItem(storeKey(pic));
           }
@@ -801,17 +1310,65 @@
 
       function scheduleSave() {
         clearTimeout(saveTimer);
-        saveTimer = setTimeout(save, 400);
+        saveTimer = setTimeout(save, 500);
       }
 
+      // Returns true when there's saved brush paint to load as well
       function restore() {
         try {
           var saved = JSON.parse(localStorage.getItem(storeKey(pic)));
-          if (!saved || saved.sig !== signature()) { return; }
+          if (!saved || saved.sig !== signature()) { return false; }
           for (var k = 0; k + 1 < saved.c.length; k += 2) {
             if (saved.c[k] >= 0 && saved.c[k] < page.R) { colours[saved.c[k]] = saved.c[k + 1]; }
           }
-        } catch (e) { /* nothing saved, or storage unavailable */ }
+          return !!saved.p;
+        } catch (e) { return false; /* nothing saved, or storage unavailable */ }
+      }
+
+      var dbPromise = null;
+
+      // Runs one request against the paint store; resolves to null if IndexedDB isn't available
+      function paintStore(mode, makeRequest) {
+        if (!dbPromise) {
+          dbPromise = new Promise(function (resolve, reject) {
+            var open = indexedDB.open('sheepyColouring', 1);
+            open.onupgradeneeded = function () { open.result.createObjectStore('paint'); };
+            open.onsuccess = function () { resolve(open.result); };
+            open.onerror = function () { reject(open.error); };
+          });
+        }
+        return dbPromise.then(function (db) {
+          return new Promise(function (resolve, reject) {
+            var req = makeRequest(db.transaction('paint', mode).objectStore('paint'));
+            req.onsuccess = function () { resolve(req.result); };
+            req.onerror = function () { reject(req.error); };
+          });
+        }).catch(function () { return null; });
+      }
+
+      // toBlob copies the canvas straight away, so this is safe to call just before the picture closes
+      function savePaint() {
+        var id = pic.id, sig = signature(), seq = paintSaveSeq[id] = (paintSaveSeq[id] || 0) + 1;
+        if (!hasPaint) {
+          paintStore('readwrite', function (store) { return store.delete(id); });
+          return;
+        }
+        paintCanvas.toBlob(function (blob) {
+          if (blob && seq === paintSaveSeq[id]) {
+            paintStore('readwrite', function (store) { return store.put({ sig: sig, blob: blob }, id); });
+          }
+        });
+      }
+
+      function loadSavedPaint(p, sig) {
+        return paintStore('readonly', function (store) { return store.get(p.id); }).then(function (saved) {
+          if (!saved || saved.sig !== sig || !saved.blob) { return null; }
+          var url = URL.createObjectURL(saved.blob);
+          return loadImage(url).then(function (img) {
+            URL.revokeObjectURL(url);
+            return img;
+          });
+        }).catch(function () { return null; });
       }
 
       function hasProgress(p) {
@@ -828,10 +1385,14 @@
           card.className = 'picture-card';
           var thumb = document.createElement('span');
           thumb.className = 'thumb';
-          var img = document.createElement('img');
-          img.src = p.src;
-          img.alt = '';
-          thumb.appendChild(img);
+          if (p.blank) {
+            thumb.innerHTML = BLANK_THUMB;
+          } else {
+            var img = document.createElement('img');
+            img.src = p.src;
+            img.alt = '';
+            thumb.appendChild(img);
+          }
           var label = document.createElement('span');
           label.className = 'label';
           label.textContent = p.title;
@@ -868,7 +1429,12 @@
         pic = p;
         page = null;
         undoStack = [];
+        undoBytes = 0;
+        hasPaint = false;
+        paintChanged = false;
+        maskArea = -1;
         undoBtn.disabled = true;
+        document.querySelector('[data-print="blank"]').hidden = !!p.blank;
         topTitle.textContent = p.title;
         lineCanvas.setAttribute('aria-label', 'Colouring picture: ' + p.title);
         document.title = p.title + ' — Colouring Corner';
@@ -886,16 +1452,23 @@
             return preparePage(loaded.img, loaded.W, loaded.H);
           });
         }).then(function (prepared) {
-          if (token !== openToken) { return; }
+          if (token !== openToken) { return null; }
           page = prepared;
-          fillCanvas.width = lineCanvas.width = page.W;
-          fillCanvas.height = lineCanvas.height = page.H;
+          [fillCanvas, paintCanvas, lineCanvas, wetCanvas, beforeCanvas, maskCanvas, snapCanvas].forEach(function (c) {
+            c.width = page.W;
+            c.height = page.H;
+          });
           lineCtx.putImageData(page.lines, 0, 0);
           page.lines = null;
           fillData = fillCtx.createImageData(page.W, page.H);
           colours = new Int32Array(page.R).fill(WHITE);
-          restore();
+          hasPaint = restore();
           paintAll();
+          updateBrushOptions();
+          return hasPaint ? loadSavedPaint(p, signature()) : null;
+        }).then(function (paintImg) {
+          if (token !== openToken) { return; }
+          if (paintImg) { paintCtx.drawImage(paintImg, 0, 0, page.W, page.H); }
           fitPaper();
           loading.hidden = true;
         }).catch(function () {
@@ -905,6 +1478,7 @@
       }
 
       function closePicture() {
+        if (page) { endStroke(true); }
         finishAnimation();
         save();
         openToken++;
@@ -941,7 +1515,10 @@
         var ctx = c.getContext('2d');
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, page.W, page.H);
-        if (withColours) { ctx.drawImage(fillCanvas, 0, 0); }
+        if (withColours) {
+          ctx.drawImage(fillCanvas, 0, 0);
+          ctx.drawImage(paintCanvas, 0, 0);
+        }
         ctx.drawImage(lineCanvas, 0, 0);
         return c.toDataURL('image/png');
       }
@@ -960,6 +1537,123 @@
 
       // ---------- Wiring ----------
 
+      // Chrome drops the click from a tap that follows a tap-then-draw too quickly (it's watching for a
+      // double tap), so fingers and pencils are answered on pointerup and the click after it is skipped
+      function onTap(el, fn) {
+        var downId = null, lastTap = 0;
+        el.addEventListener('pointerdown', function (e) { downId = e.pointerId; });
+        el.addEventListener('pointercancel', function () { downId = null; });
+        el.addEventListener('pointerup', function (e) {
+          if (e.pointerType === 'mouse' || e.pointerId !== downId) { return; }
+          downId = null;
+          lastTap = Date.now();
+          fn();
+        });
+        el.addEventListener('click', function () {
+          if (Date.now() - lastTap > 800) { fn(); }
+        });
+      }
+
+      var BUCKET_SVG ='<svg viewBox="0 0 48 48" aria-hidden="true">' +
+        '<path d="M14 19 C14 7 34 7 34 19" fill="none" stroke="#2D3142" stroke-width="3" stroke-linecap="round"/>' +
+        '<path d="M10 19 H38 L35 40 Q34.5 43 31.5 43 H16.5 Q13.5 43 13 40 Z" fill="#fff" stroke="#2D3142" stroke-width="3" stroke-linejoin="round"/>' +
+        '<path class="paint-fill" d="M10.8 20.5 H37.2 L36.4 26.5 Q36 28.5 34 28.5 Q32.3 28.5 32.3 31 V34.5 Q32.3 37 30 37 Q27.7 37 27.7 34.5 V30.5 Q27.7 28.5 25.7 28.5 H11.9 Z"/>' +
+        '<path d="M10 19 H38" stroke="#2D3142" stroke-width="3" stroke-linecap="round"/></svg>';
+
+      var ERASER_SVG = '<svg viewBox="0 0 48 48" aria-hidden="true"><g transform="rotate(-35 24 24)">' +
+        '<rect x="7" y="16" width="17" height="16" rx="3" fill="#F48FB1"/>' +
+        '<rect x="24" y="16" width="17" height="16" rx="3" fill="#90CAF9"/>' +
+        '<rect x="7" y="16" width="34" height="16" rx="3" fill="none" stroke="#2D3142" stroke-width="3"/>' +
+        '<path d="M24 16 V32" stroke="#2D3142" stroke-width="3"/></g></svg>';
+
+      var BLANK_THUMB = '<svg viewBox="0 0 120 90" aria-hidden="true">' +
+        '<rect x="6" y="6" width="108" height="78" rx="8" fill="#fff" stroke="#E0D6C8" stroke-width="3" stroke-dasharray="7 6"/>' +
+        '<path d="M24 62 C34 30 48 30 52 50 S72 70 80 38" fill="none" stroke="#FF6584" stroke-width="7" stroke-linecap="round"/>' +
+        '<path d="M28 72 C44 60 62 76 92 58" fill="none" stroke="#72CCFF" stroke-width="7" stroke-linecap="round"/>' +
+        '<path d="M92 20 Q92 30 102 30 Q92 30 92 40 Q92 30 82 30 Q92 30 92 20 Z" fill="#FFDF00" stroke="#2D3142" stroke-width="2" stroke-linejoin="round"/></svg>';
+
+      // A little wave drawn with each brush, at roughly the size strokes appear on the page
+      var PREVIEW_SIZE = 100;
+      var PREVIEW_WAVE = [];
+      for (var step = 0; step <= 30; step++) {
+        PREVIEW_WAVE.push({ x: 16 + step / 30 * 68, y: 50 - Math.sin(step / 30 * Math.PI * 2) * 22 });
+      }
+
+      var toolButtons = TOOLS.map(function (t) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'tool';
+        btn.title = t[1];
+        btn.setAttribute('aria-label', t[1]);
+        if (t[0] === 'fill') {
+          btn.innerHTML = BUCKET_SVG;
+        } else if (t[0] === 'eraser') {
+          btn.innerHTML = ERASER_SVG;
+        } else {
+          var c = document.createElement('canvas');
+          c.width = c.height = Math.round(48 * Math.min(3, window.devicePixelRatio || 1));
+          btn.appendChild(c);
+        }
+        onTap(btn, function () { chooseTool(t[0]); });
+        toolList.appendChild(btn);
+        return btn;
+      });
+
+      function drawPreviews() {
+        TOOLS.forEach(function (t, i) {
+          var c = toolButtons[i].querySelector('canvas');
+          if (!c) { return; }
+          var ctx = c.getContext('2d'), s = newStroke(t[0], currentColour, 16, 2.4);
+          PREVIEW_WAVE.forEach(function (p) { addPoint(s, p.x, p.y); });
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, c.width, c.height);
+          ctx.setTransform(c.width / PREVIEW_SIZE, 0, 0, c.height / PREVIEW_SIZE, 0, 0);
+          ctx.lineCap = ctx.lineJoin = 'round';
+          BRUSHES[t[0]](ctx, s, { x: 0, y: 0, w: PREVIEW_SIZE, h: PREVIEW_SIZE });
+        });
+        studio.style.setProperty('--paint', shade(currentColour, 0));
+      }
+
+      var sizeButtons = SIZES.map(function (sz, i) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'size';
+        btn.title = sz[0];
+        btn.setAttribute('aria-label', sz[0]);
+        var dot = document.createElement('span');
+        dot.style.width = dot.style.height = sz[2] + 'px';
+        btn.appendChild(dot);
+        onTap(btn, function () {
+          sizeIndex = i;
+          updateBrushOptions();
+        });
+        sizesBox.appendChild(btn);
+        return btn;
+      });
+
+      function chooseTool(name) {
+        tool = name;
+        updateBrushOptions();
+      }
+
+      function updateBrushOptions() {
+        var brush = tool !== 'fill';
+        toolButtons.forEach(function (btn, i) { btn.setAttribute('aria-pressed', TOOLS[i][0] === tool ? 'true' : 'false'); });
+        sizeButtons.forEach(function (btn, i) {
+          btn.disabled = !brush;
+          btn.setAttribute('aria-pressed', i === sizeIndex ? 'true' : 'false');
+        });
+        insideBtn.disabled = !brush || !!(pic && pic.blank);
+        insideBtn.setAttribute('aria-pressed', stayInside ? 'true' : 'false');
+        paper.classList.toggle('is-brush', brush);
+      }
+
+      onTap(insideBtn, function () {
+        stayInside = !stayInside;
+        try { localStorage.setItem(INSIDE_KEY, stayInside ? '1' : '0'); } catch (e) { /* only remembered for this visit */ }
+        updateBrushOptions();
+      });
+
       COLOURS.forEach(function (c, i) {
         var sw = document.createElement('button');
         sw.type = 'button';
@@ -967,27 +1661,62 @@
         sw.style.backgroundColor = c[0];
         sw.setAttribute('aria-label', c[1]);
         sw.setAttribute('aria-pressed', i === 7 ? 'true' : 'false');
-        sw.addEventListener('click', function () {
+        onTap(sw, function () {
           currentColour = parseInt(c[0].slice(1), 16);
           Array.prototype.forEach.call(palette.children, function (other) {
             other.setAttribute('aria-pressed', other === sw ? 'true' : 'false');
           });
+          drawPreviews();
         });
         palette.appendChild(sw);
       });
 
       lineCanvas.addEventListener('pointerdown', function (e) {
-        if (!page || !e.isPrimary || e.button > 0) { return; }
+        if (!page || e.button > 0) { return; }
+        if (e.pointerType === 'pen') { lastPenTime = Date.now(); }
+        // With a pencil in use, a touch is most likely the hand resting on the screen
+        if (e.pointerType === 'touch' && Date.now() - lastPenTime < 1500) { return; }
+        if (stroke) {
+          if (e.pointerType !== 'pen' || stroke.pointerType !== 'touch') { return; }
+          endStroke(false);
+        }
+        if (!e.isPrimary) { return; }
         e.preventDefault();
-        var rect = lineCanvas.getBoundingClientRect();
-        var x = Math.floor((e.clientX - rect.left) / rect.width * page.W);
-        var y = Math.floor((e.clientY - rect.top) / rect.height * page.H);
+        var p = canvasPoint(e, lineCanvas.getBoundingClientRect());
+        var x = Math.floor(p.x), y = Math.floor(p.y);
         if (x < 0 || y < 0 || x >= page.W || y >= page.H) { return; }
-        fillAt(x, y);
+        if (tool === 'fill') {
+          fillAt(x, y);
+          return;
+        }
+        finishAnimation();
+        try { lineCanvas.setPointerCapture(e.pointerId); } catch (err) { /* strokes still work without capture */ }
+        beginStroke(e, p);
       });
 
-      undoBtn.addEventListener('click', undo);
-      document.getElementById('clearBtn').addEventListener('click', startOver);
+      lineCanvas.addEventListener('pointermove', function (e) {
+        if (!stroke || e.pointerId !== stroke.pointerId) { return; }
+        if (e.pointerType === 'pen') { lastPenTime = Date.now(); }
+        var rect = lineCanvas.getBoundingClientRect();
+        var events = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+        if (!events.length) { events = [e]; }
+        events.forEach(function (ev) {
+          var p = canvasPoint(ev, rect);
+          addPoint(stroke, p.x, p.y);
+        });
+        requestDraw();
+      });
+
+      function releasePointer(e) {
+        if (stroke && e.pointerId === stroke.pointerId) { endStroke(true); }
+      }
+
+      lineCanvas.addEventListener('pointerup', releasePointer);
+      lineCanvas.addEventListener('pointercancel', releasePointer);
+      lineCanvas.addEventListener('lostpointercapture', releasePointer);
+
+      onTap(undoBtn, undo);
+      onTap(document.getElementById('clearBtn'), startOver);
       document.getElementById('printBtn').addEventListener('click', openPrintDialog);
       document.getElementById('printCancel').addEventListener('click', closePrintDialog);
 
@@ -1032,6 +1761,8 @@
       });
       window.addEventListener('hashchange', route);
 
+      drawPreviews();
+      updateBrushOptions();
       renderPicker();
       route();
     })();
