@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 800" width="1000" height="800">
+  <rect width="1000" height="800" fill="#fff"/>
+  <g fill="#fff" stroke="#000" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- Night sky -->
+    <path d="M857.5,52 A88,88 0 1 0 941.1,174.2 A74,74 0 0 1 857.5,52 Z"/>
+    <polygon points="120,78 131.1,104.7 159.9,107 138,125.8 144.7,154 120,138.9 95.3,154 102,125.8 80.1,107 108.9,104.7"/>
+    <polygon points="360,40 367.9,59.1 388.5,60.7 372.8,74.2 377.6,94.3 360,83.5 342.4,94.3 347.2,74.2 331.5,60.7 352.1,59.1"/>
+    <polygon points="600,144 606.9,160.5 624.7,162 611.1,173.6 615.3,191 600,181.7 584.7,191 588.9,173.6 575.3,162 593.1,160.5"/>
+    <polygon points="955,404 961.9,420.5 979.7,422 966.1,433.6 970.3,451 955,441.7 939.7,451 943.9,433.6 930.3,422 948.1,420.5"/>
+    <path d="M230,224 Q230,250 256,250 Q230,250 230,276 Q230,250 204,250 Q230,250 230,224 Z" stroke-width="6"/>
+    <path d="M690,38 Q690,60 712,60 Q690,60 690,82 Q690,60 668,60 Q690,60 690,38 Z" stroke-width="6"/>
+    <path d="M60,310 Q60,330 80,330 Q60,330 60,350 Q60,330 40,330 Q60,330 60,310 Z" stroke-width="6"/>
+    <path d="M500,42 Q500,60 518,60 Q500,60 500,78 Q500,60 482,60 Q500,60 500,42 Z" stroke-width="6"/>
+    <circle cx="280" cy="150" r="9" stroke-width="6"/>
+    <circle cx="760" cy="230" r="9" stroke-width="6"/>
+    <circle cx="450" cy="230" r="8" stroke-width="6"/>
+    <circle cx="970" cy="90" r="8" stroke-width="6"/>
+
+    <!-- Hill -->
+    <path d="M-20,600 C140,540 330,520 500,548 C660,574 820,610 1020,585 L1020,820 L-20,820 Z"/>
+    <ellipse cx="90" cy="669" rx="11" ry="16" stroke-width="6"/>
+    <ellipse cx="108.2" cy="679.5" rx="11" ry="16" transform="rotate(60 108.2 679.5)" stroke-width="6"/>
+    <ellipse cx="108.2" cy="700.5" rx="11" ry="16" transform="rotate(120 108.2 700.5)" stroke-width="6"/>
+    <ellipse cx="90" cy="711" rx="11" ry="16" transform="rotate(180 90 711)" stroke-width="6"/>
+    <ellipse cx="71.8" cy="700.5" rx="11" ry="16" transform="rotate(240 71.8 700.5)" stroke-width="6"/>
+    <ellipse cx="71.8" cy="679.5" rx="11" ry="16" transform="rotate(300 71.8 679.5)" stroke-width="6"/>
+    <circle cx="90" cy="690" r="12.4" stroke-width="6"/>
+    <ellipse cx="560" cy="722.1" rx="9.4" ry="13.6" stroke-width="6"/>
+    <ellipse cx="575.5" cy="731.1" rx="9.4" ry="13.6" transform="rotate(60 575.5 731.1)" stroke-width="6"/>
+    <ellipse cx="575.5" cy="748.9" rx="9.4" ry="13.6" transform="rotate(120 575.5 748.9)" stroke-width="6"/>
+    <ellipse cx="560" cy="757.9" rx="9.4" ry="13.6" transform="rotate(180 560 757.9)" stroke-width="6"/>
+    <ellipse cx="544.5" cy="748.9" rx="9.4" ry="13.6" transform="rotate(240 544.5 748.9)" stroke-width="6"/>
+    <ellipse cx="544.5" cy="731.1" rx="9.4" ry="13.6" transform="rotate(300 544.5 731.1)" stroke-width="6"/>
+    <circle cx="560" cy="740" r="10.5" stroke-width="6"/>
+    <ellipse cx="930" cy="676.9" rx="12.1" ry="17.6" stroke-width="6"/>
+    <ellipse cx="950" cy="688.4" rx="12.1" ry="17.6" transform="rotate(60 950 688.4)" stroke-width="6"/>
+    <ellipse cx="950" cy="711.5" rx="12.1" ry="17.6" transform="rotate(120 950 711.5)" stroke-width="6"/>
+    <ellipse cx="930" cy="723.1" rx="12.1" ry="17.6" transform="rotate(180 930 723.1)" stroke-width="6"/>
+    <ellipse cx="910" cy="711.6" rx="12.1" ry="17.6" transform="rotate(240 910 711.6)" stroke-width="6"/>
+    <ellipse cx="910" cy="688.4" rx="12.1" ry="17.6" transform="rotate(300 910 688.4)" stroke-width="6"/>
+    <circle cx="930" cy="700" r="13.6" stroke-width="6"/>
+    <ellipse cx="250" cy="745.3" rx="7.7" ry="11.2" stroke-width="6"/>
+    <ellipse cx="262.7" cy="752.6" rx="7.7" ry="11.2" transform="rotate(60 262.7 752.6)" stroke-width="6"/>
+    <ellipse cx="262.7" cy="767.4" rx="7.7" ry="11.2" transform="rotate(120 262.7 767.4)" stroke-width="6"/>
+    <ellipse cx="250" cy="774.7" rx="7.7" ry="11.2" transform="rotate(180 250 774.7)" stroke-width="6"/>
+    <ellipse cx="237.3" cy="767.4" rx="7.7" ry="11.2" transform="rotate(240 237.3 767.4)" stroke-width="6"/>
+    <ellipse cx="237.3" cy="752.6" rx="7.7" ry="11.2" transform="rotate(300 237.3 752.6)" stroke-width="6"/>
+    <circle cx="250" cy="760" r="8.7" stroke-width="6"/>
+    <path d="M154,620 l-10,-26 M160,620 l2,-34 M166,620 l12,-24" fill="none" stroke-width="7"/>
+    <path d="M614,640 l-10,-26 M620,640 l2,-34 M626,640 l12,-24" fill="none" stroke-width="7"/>
+    <path d="M874,640 l-10,-26 M880,640 l2,-34 M886,640 l12,-24" fill="none" stroke-width="7"/>
+    <path d="M339,772 l-10,-26 M345,772 l2,-34 M351,772 l12,-24" fill="none" stroke-width="7"/>
+    <path d="M34,760 l-10,-26 M40,760 l2,-34 M46,760 l12,-24" fill="none" stroke-width="7"/>
+    <path d="M734,760 l-10,-26 M740,760 l2,-34 M746,760 l12,-24" fill="none" stroke-width="7"/>
+
+    <!-- Telescope -->
+    <path d="M769.7,426.2 L689.7,644.2 A11,11 0 0 0 710.3,651.8 L790.3,433.8 A11,11 0 0 0 769.7,426.2 Z"/>
+    <path d="M769.7,433.8 L851.7,655.8 A11,11 0 0 0 872.3,648.2 L790.3,426.2 A11,11 0 0 0 769.7,433.8 Z"/>
+    <path d="M769,430.4 L779,676.4 A11,11 0 0 0 801,675.6 L791,429.6 A11,11 0 0 0 769,430.4 Z"/>
+    <polygon points="672.8,549.3 699.9,514.6 717.3,528.2 690.2,562.9"/>
+    <polygon points="692.7,514.1 859.4,276.3 909.9,315.7 719.5,535"/>
+    <polygon points="840.8,287.2 880.8,236 943.9,285.2 903.9,336.4"/>
+    <polygon points="753.8,419.7 768.2,398 813.9,433.7 796.4,452.9"/>
+    <circle cx="806.8" cy="450.9" r="14"/>
+
+    <!-- Sheepy: tail, legs and body -->
+    <path d="M216,410 Q220.2,423.4 206.2,428.8 Q197.6,440.8 184.2,433.4 Q168.9,434.5 166.6,420.4 Q156.6,410 166.6,399.6 Q168.9,385.5 184.2,386.6 Q197.6,379.2 206.2,391.2 Q220.2,396.6 216,410 Z"/>
+    <path d="M222.7,591.1 L207.7,661.1 A33,33 0 0 0 272.3,674.9 L287.3,604.9 A33,33 0 0 0 222.7,591.1 Z"/>
+    <path d="M297.1,615.2 L291.1,685.2 A33,33 0 0 0 356.9,690.8 L362.9,620.8 A33,33 0 0 0 297.1,615.2 Z"/>
+    <path d="M474.7,596.6 L491.7,674.6 A31,31 0 0 0 552.3,661.4 L535.3,583.4 A31,31 0 0 0 474.7,596.6 Z"/>
+    <path d="M397.5,617.8 L411.5,695.8 A33,33 0 0 0 476.5,684.2 L462.5,606.2 A33,33 0 0 0 397.5,617.8 Z"/>
+    <path d="M516.1,513.6 Q527.9,535.8 504.4,551.2 Q508.4,575.4 479.7,584.6 Q475.7,609.4 444.1,611.2 Q432,635.1 400.5,628.7 Q380.6,649.8 352.4,635.9 Q325.7,651.8 303.6,632 Q272.7,640.7 258.3,617.5 Q226.4,618.1 219.9,593.4 Q190.1,586.3 191.7,561.7 Q166.5,548.1 176,525.1 Q156.9,506.4 173.9,486.4 Q162.1,464.2 185.6,448.8 Q181.6,424.6 210.3,415.4 Q214.3,390.6 245.9,388.8 Q258,364.9 289.5,371.3 Q309.4,350.2 337.6,364.1 Q364.3,348.2 386.4,368 Q417.3,359.3 431.7,382.5 Q463.6,381.9 470.1,406.6 Q499.9,413.7 498.3,438.3 Q523.5,451.9 514,474.9 Q533.1,493.6 516.1,513.6 Z"/>
+    <path d="M250,470 q12,-16 24,-2 q10,14 -4,20" fill="none" stroke-width="6"/>
+    <path d="M320,420 q12,-16 24,-2 q10,14 -4,20" fill="none" stroke-width="6"/>
+    <path d="M300,540 q12,-16 24,-2 q10,14 -4,20" fill="none" stroke-width="6"/>
+    <path d="M215,530 q12,-16 24,-2 q10,14 -4,20" fill="none" stroke-width="6"/>
+    <path d="M390,575 q12,-16 24,-2 q10,14 -4,20" fill="none" stroke-width="6"/>
+
+    <!-- Moon on his front leg -->
+    <path d="M442,651 A21,21 0 1 0 463.2,677.6 A17,17 0 0 1 442,651 Z" stroke-width="6"/>
+
+    <!-- Ears and face -->
+    <ellipse cx="401.2" cy="443.8" rx="60" ry="25" transform="rotate(-37 401.2 443.8)"/>
+    <ellipse cx="629.1" cy="382.8" rx="60" ry="25" transform="rotate(7 629.1 382.8)"/>
+    <path d="M497,345.7 C605.2,316.7 642.8,418.4 624.3,495.9 C600.9,547.7 508.1,572.5 462,539.4 C407.2,481.6 388.9,374.7 497,345.7 Z"/>
+    <path transform="rotate(-15 476.9 448.4)" d="M448,432.6 A33,33 0 1 0 505.9,432.6 A29,29 0 0 1 448,432.6 Z" stroke-width="7"/>
+    <circle cx="480.1" cy="433" r="7" stroke-width="5"/>
+    <path transform="rotate(-15 565.8 424.6)" d="M536.8,408.8 A33,33 0 1 0 594.8,408.8 A29,29 0 0 1 536.8,408.8 Z" stroke-width="7"/>
+    <circle cx="568.9" cy="409.2" r="7" stroke-width="5"/>
+  </g>
+</svg>

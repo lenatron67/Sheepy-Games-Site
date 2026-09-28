@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 800" width="1000" height="800">
+  <rect width="1000" height="800" fill="#fff"/>
+  <g fill="#fff" stroke="#000" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- Sky: sun and clouds -->
+    <circle cx="870" cy="100" r="48"/>
+    <path d="M933,111.1 L954.7,114.9" stroke-width="8"/>
+    <path d="M914.5,146 L929.7,161.9" stroke-width="8"/>
+    <path d="M878.9,163.4 L882,185.2" stroke-width="8"/>
+    <path d="M840,156.5 L829.6,175.9" stroke-width="8"/>
+    <path d="M812.5,128.1 L792.7,137.7" stroke-width="8"/>
+    <path d="M807,88.9 L785.3,85.1" stroke-width="8"/>
+    <path d="M825.5,54 L810.3,38.1" stroke-width="8"/>
+    <path d="M861.1,36.6 L858,14.8" stroke-width="8"/>
+    <path d="M900,43.5 L910.4,24.1" stroke-width="8"/>
+    <path d="M927.5,71.9 L947.3,62.3" stroke-width="8"/>
+    <path d="M240,105 Q245.7,116 223.6,123 Q214.4,135.8 182.2,132.6 Q152.9,143.7 135,129.2 Q106.3,126.4 104.2,114.6 Q90.2,105 104.2,95.4 Q106.3,83.6 135,80.8 Q152.9,66.3 182.2,77.4 Q214.4,74.2 223.6,87 Q245.7,94 240,105 Z"/>
+    <path d="M670,70 Q673.1,80.4 652.4,87 Q639.8,98.8 610,94 Q580.2,98.8 567.6,87 Q546.9,80.4 550,70 Q546.9,59.6 567.6,53 Q580.2,41.2 610,46 Q639.8,41.2 652.4,53 Q673.1,59.6 670,70 Z"/>
+
+    <!-- Mountains -->
+    <path d="M-10,600 L-10,330 L150,215 L260,300 L385,185 L520,318 L640,245 L760,330 L885,235 L1010,320 L1010,600 Z"/>
+    <polygon points="385,185 346,222 364,236 384,222 402,238 422,220"/>
+    <polygon points="885,235 852,266 868,278 886,266 902,280 918,266"/>
+    <polygon points="150,215 120,237 135,249 152,238 168,250 181,238"/>
+
+    <!-- Grass -->
+    <path d="M-10,440 Q250,405 500,430 T1010,425 L1010,640 L-10,640 Z"/>
+
+    <!-- Bamboo -->
+    <path d="M35,40 L45,40 C50.5,40 55,44.5 55,50 L55,460 C55,465.5 50.5,470 45,470 L35,470 C29.5,470 25,465.5 25,460 L25,50 C25,44.5 29.5,40 35,40 Z"/>
+    <path d="M25,130 L55,130" stroke-width="8"/>
+    <path d="M25,220 L55,220" stroke-width="8"/>
+    <path d="M25,310 L55,310" stroke-width="8"/>
+    <path d="M25,400 L55,400" stroke-width="8"/>
+    <ellipse cx="89" cy="112" rx="38" ry="11" transform="rotate(-28 89 112)"/>
+    <ellipse cx="89" cy="292" rx="38" ry="11" transform="rotate(-28 89 292)"/>
+    <path d="M92,110 L98,110 C103.5,110 108,114.5 108,120 L108,460 C108,465.5 103.5,470 98,470 L92,470 C86.5,470 82,465.5 82,460 L82,120 C82,114.5 86.5,110 92,110 Z"/>
+    <path d="M82,200 L108,200" stroke-width="8"/>
+    <path d="M82,290 L108,290" stroke-width="8"/>
+    <path d="M82,380 L108,380" stroke-width="8"/>
+    <ellipse cx="142" cy="182" rx="38" ry="11" transform="rotate(-28 142 182)"/>
+    <ellipse cx="142" cy="362" rx="38" ry="11" transform="rotate(-28 142 362)"/>
+
+    <!-- Steam -->
+    <path d="M215,452 c-18,-20 18,-34 0,-56 c-16,-20 16,-32 2,-52" fill="none" stroke-width="7"/>
+    <path d="M690,462 c-18,-20 18,-34 0,-56 c-16,-20 16,-32 2,-52" fill="none" stroke-width="7"/>
+    <path d="M800,455 c-18,-20 18,-34 0,-56 c-16,-20 16,-32 2,-52" fill="none" stroke-width="7"/>
+
+    <!-- Back rocks and water -->
+    <ellipse cx="39.8" cy="594.3" rx="54" ry="27" transform="rotate(-15 39.8 594.3)"/>
+    <ellipse cx="71.6" cy="555.8" rx="62.1" ry="23" transform="rotate(8 71.6 555.8)"/>
+    <ellipse cx="141" cy="521.7" rx="48.6" ry="29.7" transform="rotate(1 141 521.7)"/>
+    <ellipse cx="241.7" cy="494.9" rx="59.4" ry="24.3" transform="rotate(-6 241.7 494.9)"/>
+    <ellipse cx="364.9" cy="477.9" rx="51.3" ry="28.4" transform="rotate(-13 364.9 477.9)"/>
+    <ellipse cx="500" cy="472" rx="54" ry="27" transform="rotate(10 500 472)"/>
+    <ellipse cx="635.1" cy="477.9" rx="62.1" ry="23" transform="rotate(3 635.1 477.9)"/>
+    <ellipse cx="758.3" cy="494.9" rx="48.6" ry="29.7" transform="rotate(-4 758.3 494.9)"/>
+    <ellipse cx="859" cy="521.7" rx="59.4" ry="24.3" transform="rotate(-11 859 521.7)"/>
+    <ellipse cx="928.4" cy="555.8" rx="51.3" ry="28.4" transform="rotate(12 928.4 555.8)"/>
+    <ellipse cx="960.2" cy="594.3" rx="54" ry="27" transform="rotate(5 960.2 594.3)"/>
+    <ellipse cx="500" cy="612" rx="440" ry="118"/>
+
+    <!-- Barnacles -->
+    <ellipse cx="440" cy="590" rx="150" ry="100"/>
+    <ellipse cx="340" cy="238" rx="44" ry="42"/>
+    <ellipse cx="540" cy="238" rx="44" ry="42"/>
+    <path d="M400,225 L480,225 C541.6,225 592,275.4 592,337 L592,393 C592,454.6 541.6,505 480,505 L400,505 C338.4,505 288,454.6 288,393 L288,337 C288,275.4 338.4,225 400,225 Z"/>
+    <path d="M408,257 L472,257 C527,257 572,302 572,357 L572,401 C572,456 527,501 472,501 L408,501 C353,501 308,456 308,401 L308,357 C308,302 353,257 408,257 Z"/>
+    <path d="M404,345 L484,345 C517,345 544,372 544,405 L544,441 C544,474 517,501 484,501 L404,501 C371,501 344,474 344,441 L344,405 C344,372 371,345 404,345 Z"/>
+    <circle cx="340" cy="228" r="23" stroke-width="7"/>
+    <circle cx="343" cy="231" r="12" fill="#000"/>
+    <circle cx="347" cy="226" r="4" fill="#fff" stroke="none"/>
+    <circle cx="540" cy="228" r="23" stroke-width="7"/>
+    <circle cx="543" cy="231" r="12" fill="#000"/>
+    <circle cx="547" cy="226" r="4" fill="#fff" stroke="none"/>
+    <path d="M308,478 Q440,512 572,478 A26,26 0 0 1 572,530 Q440,564 308,530 A26,26 0 0 1 308,478 Z"/>
+    <path d="M380,379 q17,13 34,0" fill="none" stroke-width="8"/>
+    <path d="M474,379 q17,13 34,0" fill="none" stroke-width="8"/>
+    <ellipse cx="444" cy="411" rx="22" ry="10" stroke-width="7"/>
+    <path d="M444,421 L444,441" stroke-width="7"/>
+    <path d="M424,439 q10,12 20,0 q10,12 20,0" fill="none" stroke-width="7"/>
+    <circle cx="440" cy="185" r="44"/>
+    <ellipse cx="466" cy="140" rx="22" ry="10" transform="rotate(-28 466 140)"/>
+    <path d="M447,146 L447,136 A5,5 0 0 0 437,136 L437,146 A5,5 0 0 0 447,146 Z"/>
+
+    <!-- Water in front -->
+    <path d="M105,560 Q127,551 148.9,560 Q170.9,569 192.8,560 Q214.7,551 236.7,560 Q258.6,569 280.6,560 Q302.5,551 324.5,560 Q346.4,569 368.3,560 Q390.3,551 412.2,560 Q434.2,569 456.1,560 Q478.1,551 500,560 Q521.9,569 543.9,560 Q565.8,551 587.8,560 Q609.7,569 631.7,560 Q653.6,551 675.5,560 Q697.5,569 719.4,560 Q741.4,551 763.3,560 Q785.3,569 807.2,560 Q829.1,551 851.1,560 Q873,569 895,560 A440,118 0 1 1 105,560 Z"/>
+    <circle cx="170" cy="610" r="14" stroke-width="6"/>
+    <circle cx="196" cy="638" r="9" stroke-width="6"/>
+    <circle cx="236" cy="606" r="7" stroke-width="6"/>
+    <circle cx="600" cy="668" r="12" stroke-width="6"/>
+    <circle cx="632" cy="640" r="8" stroke-width="6"/>
+    <circle cx="880" cy="628" r="10" stroke-width="6"/>
+    <circle cx="340" cy="676" r="9" stroke-width="6"/>
+    <circle cx="556" cy="616" r="7" stroke-width="6"/>
+
+    <!-- Arms resting on the water -->
+    <path d="M301.6,545.5 L331.6,573.5 A24,24 0 0 0 364.4,538.5 L334.4,510.5 A24,24 0 0 0 301.6,545.5 Z"/>
+    <path d="M545.6,510.5 L515.6,538.5 A24,24 0 0 0 548.4,573.5 L578.4,545.5 A24,24 0 0 0 545.6,510.5 Z"/>
+    <ellipse cx="354" cy="562" rx="28" ry="16" transform="rotate(10 354 562)"/>
+    <ellipse cx="526" cy="562" rx="28" ry="16" transform="rotate(-10 526 562)"/>
+
+    <!-- Rubber duck -->
+    <path d="M698,610 C700,654 820,658 830,614 C840,574 740,594 698,610 Z"/>
+    <circle cx="722" cy="568" r="30"/>
+    <path d="M696,568 q-28,-2 -34,8 q12,10 34,4 Z" stroke-width="7"/>
+    <circle cx="716" cy="560" r="5" fill="#000"/>
+    <path d="M762,612 q24,-4 36,14 q-22,10 -36,-14 Z" stroke-width="7"/>
+    <path d="M690,656 q20,-12 40,0 q20,12 40,0" fill="none" stroke-width="6"/>
+
+    <!-- Front rocks -->
+    <ellipse cx="953.9" cy="650.7" rx="68.2" ry="25.9" transform="rotate(-15 953.9 650.7)"/>
+    <ellipse cx="895.6" cy="694.1" rx="58.9" ry="30.2" transform="rotate(8 895.6 694.1)"/>
+    <ellipse cx="792" cy="729.2" rx="71.3" ry="24.5" transform="rotate(1 792 729.2)"/>
+    <ellipse cx="654.9" cy="752.1" rx="62" ry="28.8" transform="rotate(-6 654.9 752.1)"/>
+    <ellipse cx="500" cy="760" rx="68.2" ry="25.9" transform="rotate(-13 500 760)"/>
+    <ellipse cx="345.1" cy="752.1" rx="58.9" ry="30.2" transform="rotate(10 345.1 752.1)"/>
+    <ellipse cx="208" cy="729.2" rx="71.3" ry="24.5" transform="rotate(3 208 729.2)"/>
+    <ellipse cx="104.4" cy="694.1" rx="62" ry="28.8" transform="rotate(-4 104.4 694.1)"/>
+    <ellipse cx="46.1" cy="650.7" rx="68.2" ry="25.9" transform="rotate(-11 46.1 650.7)"/>
+  </g>
+</svg>
