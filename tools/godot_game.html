@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+<title>%%TITLE%%</title>
+<!-- Written by tools/godot_game.py from tools/godot_game.html: change those, not this page. -->
+<!-- head include -->
+%%HEAD_INCLUDE%%
+<!-- /head include -->
+%%BANNER_PRELOAD%%
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" media="print" onload="this.media='all'">
+<style>
+:root {
+	--ink: #2D3142;
+	--wool: #FFFDF8;
+	--sky: #A3E0FF;
+	--grass: #7CD936;
+	--grass-dark: #58B01C;
+	--sheep: clamp(96px, 12vw, 150px);
+}
+
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+body {
+	color: white;
+	background-color: black;
+	overflow: hidden;
+	touch-action: none;
+}
+
+#canvas {
+	display: block;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+/* The loading screen: the game's poster, Sheepy, and a bar that fills as the files arrive. */
+#status {
+	position: fixed;
+	inset: 0;
+	z-index: 1;
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: clamp(12px, 2.5vh, 22px);
+	padding: 32px 16px;
+	background: var(--wool);
+	color: var(--ink);
+	font-family: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
+	text-align: center;
+}
+
+#status a {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	min-height: 52px;
+	box-sizing: border-box;
+	border-radius: 999px;
+	text-decoration: none;
+	font-weight: 600;
+	-webkit-tap-highlight-color: transparent;
+}
+
+#status a:active {
+	transform: translateY(2px);
+}
+
+.back {
+	position: absolute;
+	top: 20px;
+	left: 20px;
+	padding: 0 22px 0 16px;
+	background: #FFFFFF;
+	border: 2px solid #ECE6D8;
+	color: var(--ink);
+	font-size: 20px;
+	box-shadow: 0 4px 0 rgba(45, 49, 66, 0.12);
+}
+
+.stage {
+	position: relative;
+}
+
+.card {
+	width: min(736px, calc(100vw - 32px), calc((100vh - 300px) * 2.16));
+	aspect-ratio: 1508 / 696;
+	box-sizing: border-box;
+	border: 8px solid #FFFFFF;
+	border-radius: 28px;
+	overflow: hidden;
+	background: var(--sky);
+	box-shadow: 0 8px 0 rgba(45, 49, 66, 0.12), 0 18px 40px rgba(45, 49, 66, 0.12);
+}
+
+.card img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.sheep {
+	position: absolute;
+	right: calc(var(--sheep) * -0.56);
+	bottom: calc(var(--sheep) * -0.12);
+	width: var(--sheep);
+	height: var(--sheep);
+	filter: drop-shadow(0 4px 0 rgba(45, 49, 66, 0.15));
+	transform-origin: 50% 90%;
+	animation: bounce 3s ease-in-out infinite;
+}
+
+.starting .sheep {
+	animation: wiggle 0.5s ease-in-out infinite;
+}
+
+.no-banner .sheep {
+	position: static;
+}
+
+h1 {
+	margin: 0;
+	font-size: clamp(30px, 4vw, 46px);
+	line-height: 1.1;
+	font-weight: 700;
+}
+
+.bar {
+	width: min(580px, calc(100vw - 48px));
+	height: 44px;
+	box-sizing: border-box;
+	padding: 7px;
+	background: #F1ECE0;
+	border-radius: 999px;
+	box-shadow: inset 0 3px 0 rgba(45, 49, 66, 0.08);
+}
+
+.fill {
+	width: 0;
+	min-width: 30px;
+	height: 100%;
+	background: var(--grass);
+	border-radius: 999px;
+	box-shadow: inset 0 -5px 0 var(--grass-dark);
+	transition: width 0.25s linear;
+}
+
+.message {
+	margin: 0;
+	min-height: 1.3em;
+	font-size: clamp(19px, 2.2vw, 24px);
+	font-weight: 600;
+}
+
+/* If the game can't start: the same poster, then what happened and two big buttons. */
+.oops {
+	display: none;
+	flex-direction: column;
+	align-items: center;
+	gap: 14px;
+}
+
+.failed .oops {
+	display: flex;
+}
+
+.failed .bar, .failed .message, #status.failed .back {
+	display: none;
+}
+
+.failed .sheep {
+	animation: none;
+}
+
+.failed .card {
+	width: min(480px, calc(100vw - 32px), calc((100vh - 470px) * 2.16));
+}
+
+.oops p {
+	margin: 0;
+	max-width: 32em;
+	font-size: clamp(17px, 2vw, 20px);
+	font-weight: 500;
+}
+
+.oops .why {
+	font-size: clamp(22px, 3vw, 30px);
+	font-weight: 700;
+}
+
+.buttons {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 14px;
+}
+
+.buttons a {
+	padding: 0 28px;
+	font-size: 22px;
+}
+
+.home {
+	background: var(--grass);
+	color: var(--ink);
+	box-shadow: 0 5px 0 var(--grass-dark);
+}
+
+.again {
+	background: #FFFFFF;
+	border: 2px solid #ECE6D8;
+	color: var(--ink);
+	box-shadow: 0 4px 0 rgba(45, 49, 66, 0.12);
+}
+
+.oops details {
+	font-size: 15px;
+	color: #5A5F70;
+}
+
+.oops details p {
+	font-size: 15px;
+	white-space: pre-line;
+}
+
+@keyframes bounce {
+	0%, 100% { transform: translateY(0) rotate(0deg); }
+	50% { transform: translateY(-12px) rotate(3deg); }
+}
+
+@keyframes wiggle {
+	0%, 100% { transform: rotate(0deg); }
+	25% { transform: rotate(-7deg); }
+	75% { transform: rotate(7deg); }
+}
+
+/* Phones and tablets held upright: clear the back button and keep Sheepy on the screen. */
+@media (max-width: 900px) {
+	#status {
+		padding-top: 92px;
+	}
+
+	.sheep {
+		right: -6px;
+		bottom: calc(var(--sheep) * -0.45);
+	}
+}
+
+@media (max-height: 640px) {
+	.failed .card {
+		display: none;
+	}
+
+	.failed .sheep {
+		position: static;
+	}
+}
+
+/* Phones held sideways: no room for the poster. */
+@media (max-height: 480px) {
+	#status {
+		padding-top: 16px;
+	}
+
+	.card {
+		display: none;
+	}
+
+	.sheep {
+		position: static;
+		--sheep: 90px;
+	}
+
+	.back {
+		top: 12px;
+		left: 12px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.sheep, .starting .sheep {
+		animation: none;
+	}
+
+	.fill {
+		transition: none;
+	}
+}
+</style>
+</head>
+<body>
+<canvas id="canvas">
+	Your browser does not support the canvas tag.
+</canvas>
+
+<noscript>
+	Your browser does not support JavaScript.
+</noscript>
+
+<div id="status" class="%%STATUS_CLASS%%">
+	<a class="back" href="/">
+		<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/></svg>
+		Back to Sheepy Games
+	</a>
+
+	<div class="stage">
+		%%BANNER_IMG%%
+		<svg class="sheep" viewBox="0 0 200 200" aria-hidden="true">
+			<circle cx="100" cy="110" r="45" fill="#FFFFFF"/>
+			<circle cx="70" cy="100" r="35" fill="#FFFFFF"/>
+			<circle cx="130" cy="100" r="35" fill="#FFFFFF"/>
+			<circle cx="75" cy="130" r="30" fill="#FFFFFF"/>
+			<circle cx="125" cy="130" r="30" fill="#FFFFFF"/>
+			<circle cx="100" cy="140" r="35" fill="#FFFFFF"/>
+			<rect x="80" y="150" width="10" height="30" rx="5" fill="#2D3142"/>
+			<rect x="110" y="150" width="10" height="30" rx="5" fill="#2D3142"/>
+			<ellipse cx="100" cy="95" rx="22" ry="28" fill="#2D3142"/>
+			<ellipse cx="72" cy="85" rx="14" ry="7" fill="#2D3142" transform="rotate(-20 72 85)"/>
+			<ellipse cx="128" cy="85" rx="14" ry="7" fill="#2D3142" transform="rotate(20 128 85)"/>
+			<circle cx="100" cy="70" r="12" fill="#FFFFFF"/>
+			<circle cx="92" cy="73" r="9" fill="#FFFFFF"/>
+			<circle cx="108" cy="73" r="9" fill="#FFFFFF"/>
+			<circle cx="92" cy="92" r="4" fill="#FFFFFF"/>
+			<circle cx="108" cy="92" r="4" fill="#FFFFFF"/>
+			<circle cx="93" cy="93" r="2" fill="#000000"/>
+			<circle cx="109" cy="93" r="2" fill="#000000"/>
+			<ellipse cx="88" cy="102" rx="4" ry="2" fill="#FF6584"/>
+			<ellipse cx="112" cy="102" rx="4" ry="2" fill="#FF6584"/>
+			<path d="M 96 106 Q 100 110 104 106" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linecap="round"/>
+		</svg>
+	</div>
+
+	<h1>%%TITLE%%</h1>
+
+	<div class="bar" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+		<div class="fill"></div>
+	</div>
+	<p class="message" aria-live="polite">Fluffing the clouds…</p>
+
+	<div class="oops" aria-live="assertive">
+		<p class="why"></p>
+		<p class="what"></p>
+		<div class="buttons">
+			<a class="home" href="/">Back to Sheepy Games</a>
+			<a class="again" href="">Try again</a>
+		</div>
+		<details>
+			<summary>Details for grown-ups</summary>
+			<p class="detail"></p>
+		</details>
+	</div>
+</div>
+
+<script src="%%ENGINE_JS%%"></script>
+<script>
+const GODOT_CONFIG = %%CONFIG%%;
+const GODOT_THREADS_ENABLED = false;
+const engine = new Engine(GODOT_CONFIG);
+
+(function () {
+	const status = document.getElementById('status');
+	const bar = status.querySelector('.bar');
+	const fill = status.querySelector('.fill');
+	const message = status.querySelector('.message');
+
+	function showProgress(current, total) {
+		if (!(current > 0 && total > 0)) {
+			return;
+		}
+		const percent = Math.min(100, Math.floor((100 * current) / total));
+		fill.style.width = percent + '%';
+		bar.setAttribute('aria-valuenow', percent);
+		if (percent >= 100) {
+			// Everything has arrived; the engine is starting up, which takes a moment more.
+			status.classList.add('starting');
+			message.textContent = 'Starting the game…';
+		} else if (percent < 30) {
+			message.textContent = 'Fluffing the clouds… ' + percent + '%';
+		} else if (percent < 70) {
+			message.textContent = 'Brushing Sheepy’s wool… ' + percent + '%';
+		} else {
+			message.textContent = 'Nearly there! ' + percent + '%';
+		}
+	}
+
+	function showFailure(why, what, err) {
+		console.error(err);
+		status.querySelector('.why').textContent = why;
+		status.querySelector('.what').textContent = what;
+		status.querySelector('.detail').textContent = err instanceof Error ? err.message : String(err || 'An unknown error occurred.');
+		status.classList.add('failed');
+	}
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+	if (missing.length !== 0) {
+		showFailure('Oh no! This game can’t start here.',
+			'It needs a newer web browser. Try another Sheepy game, or ask a grown-up to update this one.',
+			'The browser is missing:\n' + missing.join('\n'));
+		return;
+	}
+
+	engine.startGame({
+		'onProgress': showProgress,
+	}).then(() => {
+		// Wait for the game's first frame so there's no flash of an empty canvas. No fade: the
+		// engine is busy setting up for a while, and a fade would stall half-way over the game.
+		requestAnimationFrame(() => requestAnimationFrame(() => status.remove()));
+	}, (err) => {
+		showFailure('Oh no! The game got stuck while loading.',
+			'Try again, or play another Sheepy game.',
+			err);
+	});
+}());
+</script>
+</body>
+</html>
