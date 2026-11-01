@@ -156,44 +156,68 @@ class AudioManager {
         return this.noiseBuffer;
     }
     
-    // Play game music
-    playGameMusic() {
+    // Note name ('C4', 'F#4', 'Bb3') to frequency in Hz; '-' or empty is a rest (0)
+    noteToFreq(name) {
+        if (!name || name === '-') return 0;
+        const m = /^([A-G])(#|b)?(-?\d)$/.exec(name);
+        if (!m) return 0;
+        const semis = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+        const midi = (parseInt(m[3], 10) + 1) * 12 + semis;
+        return 440 * Math.pow(2, (midi - 69) / 12);
+    }
+
+    // Turn a level's music settings (see levels.js) into frequencies the sequencer can play
+    compileTrack(track) {
+        // Accepts 'C4 E4 -' strings or arrays of note names and/or frequencies
+        const toFreqs = (notes) => (Array.isArray(notes) ? notes : notes.trim().split(/\s+/))
+            .map(n => typeof n === 'number' ? n : this.noteToFreq(n));
+        return {
+            melody: toFreqs(track.melody),
+            bass: toFreqs(track.bass),
+            tempo: track.tempo || 0.13,
+            wave: track.wave || 'triangle',
+            gain: track.gain || 0.1,
+            drums: track.drums || 'standard'
+        };
+    }
+
+    // Play game music. `track` is a level's music settings; defaults to the original Meadow tune.
+    playGameMusic(track) {
         if (this.isGameMusicActive) return;
-        
+
         this.isGameMusicActive = true;
         this.gameBeat = 0;
-        const tempo = 0.13; // seconds per beat
-        
+        const song = this.compileTrack(track || { melody: this.GAME_MELODY, bass: [98.00, 130.81, 98.00, 146.83] });
+        this.activeTrack = song;
+        const tempo = song.tempo; // seconds per beat
+
         const playBeat = () => {
             if (!this.isGameMusicActive) return;
-            
+
             const t = this.audioContext.currentTime;
-            const freq = this.GAME_MELODY[this.gameBeat % this.GAME_MELODY.length];
-            
+            const freq = song.melody[this.gameBeat % song.melody.length];
+
             // Melody
             if (freq) {
                 const osc = this.audioContext.createOscillator();
-                osc.type = 'triangle';
+                osc.type = song.wave;
                 osc.frequency.setValueAtTime(freq, t);
-                
+
                 const gain = this.audioContext.createGain();
                 gain.gain.setValueAtTime(0, t);
-                gain.gain.linearRampToValueAtTime(0.1, t + 0.01);
+                gain.gain.linearRampToValueAtTime(song.gain, t + 0.01);
                 gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-                
+
                 osc.connect(gain);
                 gain.connect(this.audioContext.destination);
                 osc.start(t);
                 osc.stop(t + 0.15);
             }
-            
-            // Bass (every 4 beats)
+
+            // Bass (every 4 beats): the bar's root note, then its fifth
             if (this.gameBeat % 4 === 0) {
-                let bassFreq = 98.00;
                 const bar = Math.floor((this.gameBeat % 32) / 8);
-                
-                if (bar === 1) bassFreq = 130.81;
-                if (bar === 3) bassFreq = 146.83;
+                let bassFreq = song.bass[bar % song.bass.length];
                 if (this.gameBeat % 8 !== 0) bassFreq *= 1.5;
                 
                 const osc = this.audioContext.createOscillator();
@@ -216,41 +240,8 @@ class AudioManager {
             }
             
             // Percussion
-            const step = this.gameBeat % 4;
-            if (step === 0) {
-                // Kick
-                const osc = this.audioContext.createOscillator();
-                osc.frequency.setValueAtTime(150, t);
-                osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.1);
-                
-                const gain = this.audioContext.createGain();
-                gain.gain.setValueAtTime(0.2, t);
-                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-                
-                osc.connect(gain);
-                gain.connect(this.audioContext.destination);
-                osc.start(t);
-                osc.stop(t + 0.1);
-            } else if (step === 2) {
-                // Hi-hat (noise)
-                const src = this.audioContext.createBufferSource();
-                src.buffer = this.getNoiseBuffer();
-                
-                const gain = this.audioContext.createGain();
-                gain.gain.setValueAtTime(0.1, t);
-                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-                
-                const filter = this.audioContext.createBiquadFilter();
-                filter.type = 'highpass';
-                filter.frequency.value = 1000;
-                
-                src.connect(filter);
-                filter.connect(gain);
-                gain.connect(this.audioContext.destination);
-                src.start(t);
-                src.stop(t + 0.1);
-            }
-            
+            this.playDrums(song.drums, this.gameBeat, t);
+
             this.gameBeat++;
             this.gameMusicTimer = setTimeout(playBeat, tempo * 1000);
         };
@@ -258,6 +249,80 @@ class AudioManager {
         playBeat();
     }
     
+    // Drum patterns, one step (beat) at a time
+    playDrums(style, beat, t) {
+        const step = beat % 4;
+        const oddBar = Math.floor(beat / 4) % 2 === 1;
+        switch (style) {
+            case 'soft': // gentle: quiet kick and hat
+                if (step === 0) this.playKick(t, 0.08);
+                if (step === 2) this.playHat(t, 0.04);
+                break;
+            case 'tribal': // kick plus low toms on alternate bars
+                if (step === 0) this.playKick(t, 0.2);
+                if (step === 2) oddBar ? this.playTom(t, 0.18, 180) : this.playHat(t, 0.1);
+                if (step === 3 && oddBar) this.playTom(t, 0.12, 140);
+                break;
+            case 'driving': // kick on every other beat, hat in between
+                if (step === 0 || step === 2) this.playKick(t, 0.18);
+                if (step === 1 || step === 3) this.playHat(t, 0.08);
+                break;
+            default: // 'standard': the original Meadow beat
+                if (step === 0) this.playKick(t, 0.2);
+                else if (step === 2) this.playHat(t, 0.1);
+        }
+    }
+
+    playKick(t, volume) {
+        const osc = this.audioContext.createOscillator();
+        osc.frequency.setValueAtTime(150, t);
+        osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.1);
+
+        const gain = this.audioContext.createGain();
+        gain.gain.setValueAtTime(volume, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+
+        osc.connect(gain);
+        gain.connect(this.audioContext.destination);
+        osc.start(t);
+        osc.stop(t + 0.1);
+    }
+
+    playHat(t, volume) {
+        const src = this.audioContext.createBufferSource();
+        src.buffer = this.getNoiseBuffer();
+
+        const gain = this.audioContext.createGain();
+        gain.gain.setValueAtTime(volume, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+
+        const filter = this.audioContext.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 1000;
+
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.audioContext.destination);
+        src.start(t);
+        src.stop(t + 0.1);
+    }
+
+    playTom(t, volume, startFreq) {
+        const osc = this.audioContext.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(startFreq, t);
+        osc.frequency.exponentialRampToValueAtTime(60, t + 0.15);
+
+        const gain = this.audioContext.createGain();
+        gain.gain.setValueAtTime(volume, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+
+        osc.connect(gain);
+        gain.connect(this.audioContext.destination);
+        osc.start(t);
+        osc.stop(t + 0.15);
+    }
+
     // Stop game music
     stopGameMusic() {
         this.isGameMusicActive = false;

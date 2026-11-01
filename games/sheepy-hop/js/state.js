@@ -15,6 +15,7 @@ class GameState {
         this.maxLives = 3;
         this.lives = 3;
         this.isInvincible = false;
+        this.lap = 0;
 
         // Scores and collections
         this.pinkCoinsCollected = 0; // Represents primary collectable
@@ -89,7 +90,9 @@ uiLayer: null,
         if (resetLives) {
             this.lives = this.maxLives;
             this.score = 0;
+            this.lap = 0; // laps completed round all the worlds this run (drives enemy speed-up)
         }
+        this.levelStartScore = this.score; // so a world's best score counts only that level
         this.playerVelY = 0;
         this.lastTime = 0;
         this.bonusTimeRemaining = 10;

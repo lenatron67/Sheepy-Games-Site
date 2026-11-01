@@ -9,6 +9,11 @@ const TUNING_FPS = 60;
 // backgrounded would apply seconds of movement (and bonus-round time) in one frame.
 const MAX_DELTA_TIME = 0.1;
 
+// Tablets and phones have 2-3 screen pixels per CSS pixel. Rendering at 1 looks soft once the
+// browser stretches it; full 2-3x is sharp but makes the GPU fill 4-9x the pixels. 1.5 is the
+// middle ground: raise to 2 if tablets keep a smooth frame rate.
+const MAX_PIXEL_RATIO = 1.5;
+
 // Frame-rate-independent version of a per-frame lerp factor (e.g. 0.05 = "close 5% of the gap each 60fps frame")
 function frameLerpAlpha(alphaPerFrame, frameScale) {
     return 1 - Math.pow(1 - alphaPerFrame, frameScale);
@@ -52,6 +57,8 @@ class GameEngine {
         this.createGround();
         this.createPlayer();
         this.createLevelObjects();
+        AmbientEffects.create(this.scene, LEVELS[gameState.currentLevelName].ambientEffect, this.player.position);
+        this.sceneFresh = true; // level built but not played yet, so Play can start it without rebuilding
         this.setupUIReferences();
         this.setupEventListeners();
         this.setupControls();
@@ -93,14 +100,13 @@ class GameEngine {
 
     createScene() {
         this.scene = new THREE.Scene();
-        const initialSky = LEVELS[gameState.currentLevelName].skyColor;
-        this.scene.background = new THREE.Color(initialSky);
-        this.scene.fog = new THREE.Fog(initialSky, 20, 60);
+        this.applyAtmosphere(LEVELS[gameState.currentLevelName]);
 
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         this.camera.position.set(0, 25, 20);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.shadowMap.enabled = true;
         document.getElementById('canvas-container').appendChild(this.renderer.domElement);
@@ -113,11 +119,20 @@ class GameEngine {
         gameState.renderer = this.renderer;
     }
 
+    // Sky colour and fog for a level (fog fades to the sky colour)
+    applyAtmosphere(level) {
+        const a = level.atmosphere;
+        this.scene.background = new THREE.Color(level.skyColor);
+        this.scene.fog = new THREE.Fog(level.skyColor, a.fogNear, a.fogFar);
+    }
+
     createLighting() {
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        const a = LEVELS[gameState.currentLevelName].atmosphere;
+        const ambientLight = new THREE.AmbientLight(a.ambientColor, a.ambientIntensity);
         this.scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        // The sun follows Sheepy (see updateCamera) so its ±30 shadow area is always around the player
+        const dirLight = new THREE.DirectionalLight(a.sunColor, a.sunIntensity);
         dirLight.position.set(20, 40, 20);
         dirLight.castShadow = true;
         dirLight.shadow.camera.right = 30;
@@ -125,6 +140,8 @@ class GameEngine {
         dirLight.shadow.camera.top = 30;
         dirLight.shadow.camera.bottom = -30;
         this.scene.add(dirLight);
+        this.scene.add(dirLight.target);
+        this.sunLight = dirLight;
     }
 
     createGround() {
@@ -166,6 +183,9 @@ class GameEngine {
             gameState.pinkCoins.push(coin);
         }
 
+        // Landmarks and ground detail (if this biome has any), before the obstacles so they can keep off it
+        Scenery.create(this.scene, level);
+
         for (let i = 0; i < level.TREES_COUNT; i++) {
             const tree = ModelCreator[level.obstacleModel]();
             let pos;
@@ -173,6 +193,7 @@ class GameEngine {
                 pos = LevelUtils.getRandomPosition(level.WORLD_SIZE);
             } while (
                 LevelUtils.isTooCloseToSpawn(pos.x, pos.z, level.TREE_EXCLUSION_ZONE) ||
+                Scenery.blocksObstacles(pos.x, pos.z) ||
                 this.pinkCoins.some(c => Math.abs(c.position.x - pos.x) < 3 && Math.abs(c.position.z - pos.z) < 3)
             );
 
@@ -199,7 +220,9 @@ class GameEngine {
                     aiType: level.enemyTypes[i],
                     home: home,
                     velocity: new THREE.Vector3((Math.random() - 0.5), 0, (Math.random() - 0.5)).normalize(),
-                    speed: level.enemySpeed
+                    speed: level.enemySpeed,
+                    phaseOffset: Math.random() * 10, // so enemies' movement rhythms aren't in sync
+                    clock: 0
                 };
                 this.scene.add(enemy);
                 this.snakes.push(enemy);
@@ -224,7 +247,8 @@ class GameEngine {
     }
 
     setupEventListeners() {
-        document.getElementById('btn-start').addEventListener('click', () => this.startGame());
+        document.getElementById('btn-start').addEventListener('click', () => this.showWorldMap());
+        document.getElementById('btn-map-back').addEventListener('click', () => this.hideWorldMap());
         document.getElementById('btn-credits').addEventListener('click', () => {
             document.getElementById('credits-modal').style.display = 'block';
         });
@@ -252,9 +276,11 @@ class GameEngine {
 
         document.getElementById('btn-try-again').addEventListener('click', () => {
             document.getElementById('game-over-screen').style.display = 'none';
-            // Start from Level 1 and reset lives
-            this.startNextLevel('MAIN', true);
+            // Replay the world you were on, with fresh lives and score
+            this.startNextLevel(gameState.currentLevelName, true);
         });
+
+        document.getElementById('btn-go-world-map').addEventListener('click', () => this.showWorldMap());
 
         document.getElementById('action-btn').addEventListener('touchstart', (e) => {
             e.preventDefault();
@@ -262,7 +288,11 @@ class GameEngine {
         }, { passive: false });
 
         window.addEventListener('keydown', (e) => {
-            if (gameState.gameState === 'START' && e.key === 'Enter') this.startGame();
+            // Keyboard: Enter opens the world map, then Enter again plays the furthest world reached
+            if (gameState.gameState === 'START' && e.key === 'Enter') {
+                if (this.isWorldMapOpen()) this.playWorld(Progress.furthestUnlocked());
+                else this.showWorldMap();
+            }
             if (gameState.gameState === 'PLAYING' || gameState.gameState === 'BONUS') {
                 this.keys[e.key] = true;
                 if (e.code === 'Space') this.handleAction();
@@ -340,24 +370,18 @@ class GameEngine {
 
     startGame() {
         if (gameState.gameState === 'PLAYING') return;
+        this.sceneFresh = false;
 
         audioManager.stopThemeMusic();
-        audioManager.playGameMusic();
+        audioManager.stopGameMusic(); // switch to this world's tune even if another was still playing
+        audioManager.playGameMusic(LEVELS[gameState.currentLevelName].music);
 
         this.uiElements.startScreen.style.display = 'none';
+        this.hideWorldMap();
         document.getElementById('leaderboard-modal').style.display = 'none';
         this.uiElements.uiLayer.style.display = 'block';
 
-        // --- Option 1 Splash Screen Trigger ---
-        const splash1 = document.getElementById('level-splash-1');
-        if (splash1) {
-            splash1.innerText = LEVELS[gameState.currentLevelName].displayName;
-            splash1.style.display = 'flex';
-            setTimeout(() => {
-                splash1.style.display = 'none';
-            }, 2500);
-        }
-        // --------------------------------------
+        this.showLevelSplash(LEVELS[gameState.currentLevelName]);
 
         this.uiElements.joystickContainer.style.display = 'block';
         this.uiElements.actionButton.style.display = 'flex';
@@ -367,6 +391,130 @@ class GameEngine {
 
         audioManager.init();
         audioManager.playBaa(220);
+    }
+
+    // "LEVEL 3" with "❄️ Snowy Peaks" underneath, shown for 2.5s as a level starts
+    showLevelSplash(level) {
+        const splash = document.getElementById('level-splash-1');
+        if (!splash) return;
+        document.getElementById('splash-level').textContent = level.displayName;
+        // From the second lap on, show the lap so players know why the enemies are faster
+        const lapText = gameState.lap > 0 ? ` · Lap ${gameState.lap + 1}` : '';
+        document.getElementById('splash-biome').textContent = `${level.icon} ${level.biomeName}${lapText}`;
+        splash.style.display = 'flex';
+        clearTimeout(this.splashTimer); // a previous level's timer mustn't hide this splash early
+        this.splashTimer = setTimeout(() => { splash.style.display = 'none'; }, 2500);
+    }
+
+    // Clear the splash early (level complete, Game Over or the map shouldn't appear underneath it)
+    hideLevelSplash() {
+        clearTimeout(this.splashTimer);
+        const splash = document.getElementById('level-splash-1');
+        if (splash) splash.style.display = 'none';
+    }
+
+    // ---------- World map ----------
+
+    isWorldMapOpen() {
+        return document.getElementById('world-map').style.display === 'block';
+    }
+
+    // Open the map over the title screen (also used from Game Over)
+    showWorldMap() {
+        gameState.gameState = 'START'; // freeze the scene behind the map
+        this.hideLevelSplash();
+        this.uiElements.gameOverScreen.style.display = 'none';
+        this.uiElements.uiLayer.style.display = 'none';
+        this.uiElements.joystickContainer.style.display = 'none';
+        this.uiElements.actionButton.style.display = 'none';
+        document.getElementById('leaderboard-modal').style.display = 'none';
+        this.uiElements.startScreen.style.display = 'flex'; // behind the map, so Back returns to the title
+        this.renderWorldMap();
+        document.getElementById('world-map').style.display = 'block';
+    }
+
+    hideWorldMap() {
+        document.getElementById('world-map').style.display = 'none';
+    }
+
+    // Build the adventure path: worlds zigzag up from the first (bottom) to the last (top).
+    // Positions are computed from LEVEL_ORDER, so new biomes slot in automatically.
+    renderWorldMap() {
+        const panel = document.getElementById('world-map-panel');
+        const nodes = document.getElementById('world-map-nodes');
+        const path = document.getElementById('world-map-path');
+        const progress = Progress.load();
+        const n = LEVEL_ORDER.length;
+
+        // Background fades through each biome's colour, first world at the bottom
+        const stops = LEVEL_ORDER.map((name, i) => `${LEVELS[name].mapColor} ${Math.round(i / (n - 1) * 100)}%`);
+        panel.style.background = `linear-gradient(to top, ${stops.join(', ')})`;
+
+        const points = LEVEL_ORDER.map((name, i) => ({
+            x: i % 2 === 0 ? 34 : 64,              // percent across
+            y: 86 - i * (68 / Math.max(1, n - 1))  // percent down
+        }));
+
+        // Dotted S-curve linking the worlds
+        let d = `M ${points[0].x} ${points[0].y}`;
+        for (let i = 1; i < n; i++) {
+            const a = points[i - 1], b = points[i], half = (a.y - b.y) / 2;
+            d += ` C ${a.x} ${a.y - half}, ${b.x} ${b.y + half}, ${b.x} ${b.y}`;
+        }
+        path.setAttribute('d', d);
+
+        nodes.textContent = '';
+        LEVEL_ORDER.forEach((name, i) => {
+            const level = LEVELS[name];
+            const unlocked = i < progress.unlocked;
+            const best = Progress.bestScore(name);
+
+            const node = document.createElement('button');
+            node.className = 'world-node' + (unlocked ? '' : ' locked');
+            node.style.left = points[i].x + '%';
+            node.style.top = points[i].y + '%';
+            node.disabled = !unlocked;
+            node.dataset.level = name;
+
+            const icon = document.createElement('span');
+            icon.className = 'world-icon';
+            icon.textContent = level.icon;
+
+            const text = document.createElement('span');
+            text.className = 'world-text';
+            const title = document.createElement('span');
+            title.className = 'world-name';
+            title.textContent = level.biomeName;
+            const status = document.createElement('span');
+            status.className = 'world-status';
+            status.textContent = !unlocked ? '🔒 Locked' : (best !== null ? `★ ${best.toLocaleString()}` : 'NEW!');
+            text.appendChild(title);
+            text.appendChild(status);
+
+            node.appendChild(icon);
+            node.appendChild(text);
+
+            if (i === progress.unlocked - 1) { // Sheepy waits at the furthest world reached
+                const sheep = document.createElement('span');
+                sheep.className = 'world-sheep';
+                sheep.textContent = '🐑';
+                node.appendChild(sheep);
+            }
+
+            if (unlocked) node.addEventListener('click', () => this.playWorld(name));
+            nodes.appendChild(node);
+        });
+    }
+
+    // Start a fresh run (full lives, score 0) on an unlocked world
+    playWorld(levelName) {
+        if (!Progress.isUnlocked(levelName)) return;
+        this.hideWorldMap();
+        if (this.sceneFresh && gameState.currentLevelName === levelName) {
+            this.startGame(); // first play on page load: this level is already built
+        } else {
+            this.startNextLevel(levelName, true);
+        }
     }
 
     handleResize() {
@@ -424,6 +572,12 @@ class GameEngine {
             }
         }
 
+        // Landmarks push out the same way, so Sheepy slides round them
+        const pushed = { x: newX, z: newZ };
+        Scenery.pushOut(pushed, playerRadius);
+        newX = pushed.x;
+        newZ = pushed.z;
+
         this.player.position.x = newX;
         this.player.position.z = newZ;
         // Clamp player position to stay within the fence bounds
@@ -465,13 +619,17 @@ class GameEngine {
     }
 
     updateCoins(frameScale) {
+        // Collectables can only be picked up in normal play, never during the bonus round:
+        // a pickup there would re-run checkProgression and restart the bonus timer.
+        const canCollect = gameState.gameState === 'PLAYING';
+
         // Only check pink coins if player is not sheepy (phases 1 and 3)
         if (!gameState.isSheepy) {
             for (let i = this.pinkCoins.length - 1; i >= 0; i--) {
                 const coin = this.pinkCoins[i];
                 coin.rotation.y += 0.05 * frameScale;
 
-                if (this.player.position.distanceTo(coin.position) < 2) {
+                if (canCollect && this.player.position.distanceTo(coin.position) < 2) {
                     this.scene.remove(coin);
                     this.pinkCoins.splice(i, 1);
                     gameState.pinkCoins.splice(i, 1);
@@ -487,7 +645,7 @@ class GameEngine {
                 const coin = this.goldCoins[i];
                 coin.rotation.y += 0.05 * frameScale;
 
-                if (this.player.position.distanceTo(coin.position) < 5) {
+                if (canCollect && this.player.position.distanceTo(coin.position) < 5) {
                     this.scene.remove(coin);
                     this.goldCoins.splice(i, 1);
                     gameState.goldCoins.splice(i, 1);
@@ -549,6 +707,12 @@ class GameEngine {
 
         this.camera.position.lerp(targetPosition, frameLerpAlpha(0.05, frameScale));
         this.camera.lookAt(this.player.position);
+
+        // Keep the sun (and its shadow area) centred on Sheepy, at the same angle as before
+        if (this.sunLight) {
+            this.sunLight.position.set(this.player.position.x + 20, 40, this.player.position.z + 20);
+            this.sunLight.target.position.set(this.player.position.x, 0, this.player.position.z);
+        }
     }
 
     transformToSheepy() {
@@ -616,37 +780,58 @@ class GameEngine {
         audioManager.playBaa(440);
         audioManager.stopAllMusic();
         this.uiElements.uiLayer.style.display = 'none';
+        this.hideLevelSplash();
 
-        const currentIndex = LEVEL_ORDER.indexOf(gameState.currentLevelName);
+        const levelName = gameState.currentLevelName;
+        const currentIndex = LEVEL_ORDER.indexOf(levelName);
         const nextLevel = LEVEL_ORDER[(currentIndex + 1) % LEVEL_ORDER.length];
+        const beatAllWorlds = currentIndex === LEVEL_ORDER.length - 1;
+        if (beatAllWorlds) gameState.lap++; // next lap: enemies 10% faster (see enemySpeedMultiplier)
 
+        // Save progress: open the next world, record this world's best score
+        const result = Progress.completeLevel(levelName, gameState.score - gameState.levelStartScore);
+
+        // Lives carry over unchanged: 3 lives last the whole run
+        const extras = [];
+        if (result.unlockedLevel) extras.push(`🔓 ${LEVELS[result.unlockedLevel].biomeName} unlocked!`);
+        if (result.newBest) extras.push('★ New best!');
+
+        // The last world gets a longer celebration, then the run carries on from the first world
+        const bannerMs = beatAllWorlds ? 4500 : 3000;
         const banner = document.getElementById('level-complete-banner');
-        const bannerScore = document.getElementById('banner-score-value');
         if (banner) {
-            bannerScore.innerText = gameState.score;
+            document.getElementById('banner-title').textContent = beatAllWorlds
+                ? `YOU BEAT\nALL ${LEVEL_ORDER.length} WORLDS!`
+                : 'LEVEL\nCOMPLETE!';
+            document.getElementById('banner-score-value').textContent = gameState.score;
+            const extrasEl = document.getElementById('banner-extras');
+            extrasEl.textContent = '';
+            extras.forEach(line => {
+                const div = document.createElement('div');
+                div.textContent = line;
+                extrasEl.appendChild(div);
+            });
             banner.style.display = 'block';
             banner.style.animation = 'none';
             banner.offsetHeight; // force reflow to restart animation
-            banner.style.animation = 'bannerPop 3s ease forwards';
+            banner.style.animation = `bannerPop ${bannerMs / 1000}s ease forwards`;
         }
+        if (beatAllWorlds) setTimeout(() => audioManager.playBaa(660), 400);
 
         setTimeout(() => {
             if (banner) banner.style.display = 'none';
             this.startNextLevel(nextLevel, false);
-        }, 3000);
+        }, bannerMs);
     }
 
     startNextLevel(levelName, resetLives = false) {
+        AmbientEffects.dispose();
+        Scenery.dispose();
         while (this.scene.children.length > 0) {
             const obj = this.scene.children[0];
             this.scene.remove(obj);
         }
         ParticleSystem.clearParticles();
-
-        const splash1 = document.getElementById('level-splash-1');
-        if (splash1) {
-            splash1.innerText = LEVELS[levelName].displayName;
-        }
 
         this.pinkCoins = [];
         this.goldCoins = [];
@@ -659,13 +844,12 @@ class GameEngine {
         this.sparkBudget = 0;
 
         gameState.init(audioManager, this, levelName, resetLives);
-        const sky = LEVELS[levelName].skyColor;
-        this.scene.background = new THREE.Color(sky);
-        this.scene.fog = new THREE.Fog(sky, 20, 60);
+        this.applyAtmosphere(LEVELS[levelName]);
         this.createLighting();
         this.createGround();
         this.createPlayer();
         this.createLevelObjects();
+        AmbientEffects.create(this.scene, LEVELS[levelName].ambientEffect, this.player.position);
         this.setupUIReferences();
         this.startGame();
     }
@@ -697,6 +881,7 @@ class GameEngine {
 
     async triggerGameOver() {
         gameState.gameState = 'GAME_OVER';
+        this.hideLevelSplash();
         this.uiElements.uiLayer.style.display = 'none';
         this.uiElements.gameOverScreen.style.display = 'flex';
 
@@ -736,6 +921,9 @@ class GameEngine {
         const enemyLimit = (LEVELS[gameState.currentLevelName].WORLD_SIZE / 2) - 2;
         const WALL_STEER_MARGIN = 8;
         const wallSteerStart = enemyLimit - WALL_STEER_MARGIN;
+
+        const speedScale = this.enemySpeedMultiplier();
+        const behaviour = LEVELS[gameState.currentLevelName].enemyBehaviour;
 
         for (let snake of this.snakes) {
             // 1. Determine target based on AI type and Sheepy Mode
@@ -781,6 +969,24 @@ class GameEngine {
                 }
             }
 
+            // Landmarks: within 4 units of one, an enemy heading into it turns to slide round it
+            // instead (a plain repel would leave it stuck when its target is on the far side)
+            for (const s of Scenery.solids) {
+                const { dist, nx, nz } = Scenery.edge(s, snake.position.x, snake.position.z);
+                if (dist > 4) continue;
+                const into = -(desiredVelocity.x * nx + desiredVelocity.z * nz); // > 0 = heading into it
+                if (into <= 0) continue;
+                const closeness = Math.min(1, (4 - dist) / 4); // 0 at 4 units away, 1 at its edge
+                // Go round whichever way the enemy is already moving. Choosing by the target alone
+                // flips every frame on a flat wall with the target straight behind it (stuck).
+                // The target only breaks the tie when the enemy is heading dead into the wall.
+                let tx = -nz, tz = nx;
+                const vel = snake.userData.velocity;
+                if ((tx * vel.x + tz * vel.z) + 0.01 * (tx * desiredVelocity.x + tz * desiredVelocity.z) < 0) { tx = -tx; tz = -tz; }
+                desiredVelocity.x += (nx + tx) * into * closeness;
+                desiredVelocity.z += (nz + tz) * into * closeness;
+            }
+
             // Boundary avoidance: push away from each fence wall, ramping up to 2x as the enemy
             // reaches its limit. That outweighs the (unit-length) chase/flee direction, so a fleeing
             // enemy slides along the fence instead of pressing into it.
@@ -797,22 +1003,37 @@ class GameEngine {
             // Smoothly adjust current velocity to desired velocity
             snake.userData.velocity.lerp(desiredVelocity, deltaTime * 2.0).normalize();
 
-            // Adjust speed based on state
-            const currentSpeed = isScared ? (snake.userData.speed * 0.5) : snake.userData.speed;
+            // Speed: world speed x lap/phase scaling, halved while fleeing
+            const baseSpeed = snake.userData.speed * speedScale * (isScared ? 0.5 : 1);
+
+            // Biome movement rhythm (weave / slide / pounce / scuttle) at about the same average speed
+            const motion = this.enemyMotion(snake, behaviour, deltaTime, isScared);
+            const vel = snake.userData.velocity;
+            const side = new THREE.Vector3(-vel.z, 0, vel.x);
+            const step = new THREE.Vector3()
+                .addScaledVector(vel, baseSpeed * motion.speedFactor)
+                .addScaledVector(side, motion.sideSpeed);
 
             // Move snake
-            snake.position.addScaledVector(snake.userData.velocity, currentSpeed * deltaTime);
+            snake.position.addScaledVector(step, deltaTime);
 
             // Never let an enemy through the fence, even if steering loses the argument
             snake.position.x = Math.max(-enemyLimit, Math.min(enemyLimit, snake.position.x));
             snake.position.z = Math.max(-enemyLimit, Math.min(enemyLimit, snake.position.z));
 
+            // ...or into a landmark
+            Scenery.pushOut(snake.position, 1);
+
             // Keep grounded
             snake.position.y = 0.5;
 
-            // Look in direction of travel
-            const lookAtTarget = new THREE.Vector3().copy(snake.position).add(snake.userData.velocity);
-            snake.lookAt(lookAtTarget);
+            // Face the way it's actually moving, then apply the biome's pose
+            const facing = step.lengthSq() > 1e-6 ? step : vel;
+            snake.lookAt(new THREE.Vector3().copy(snake.position).add(facing));
+            if (motion.yaw) snake.rotateY(motion.yaw);
+            if (motion.pitch) snake.rotateX(motion.pitch);
+            if (motion.roll) snake.rotateZ(motion.roll);
+            snake.scale.set(1, motion.scaleY, motion.scaleZ);
 
             // Visual Updates (Scared vs Normal)
             if (isScared && !snake.userData.isScared) {
@@ -833,6 +1054,65 @@ class GameEngine {
         }
     }
 
+    // Enemy speed-up (see ENEMY_SCALING in levels.js): +10% per completed lap of all the worlds,
+    // +5% during the second batch of coins
+    enemySpeedMultiplier() {
+        return 1 + ENEMY_SCALING.PER_LAP * gameState.lap
+                 + (gameState.currentPhase === 3 ? ENEMY_SCALING.SECOND_BATCH : 0);
+    }
+
+    // Per-biome movement rhythm. speedFactor averages about 1 over time, so each enemy covers
+    // the same ground as its plain speed would; sideSpeed and the pose values only change the feel.
+    enemyMotion(snake, behaviour, dt, isScared) {
+        const ud = snake.userData;
+        ud.clock = (ud.clock || 0) + dt;
+        const t = ud.clock + (ud.phaseOffset || 0);
+        const m = { speedFactor: 1, sideSpeed: 0, yaw: 0, pitch: 0, roll: 0, scaleY: 1, scaleZ: 1 };
+
+        switch (behaviour) {
+            case 'weave': // snakes slither side to side around their path (no net drift)
+                m.sideSpeed = Math.cos(t * 6) * 0.8 * 6; // swing of ±0.8 units
+                break;
+
+            case 'slide': { // penguins waddle 1.6s at 0.7x, then belly-slide 0.8s at 1.6x (averages 1.0x)
+                const c = t % 2.4;
+                if (c >= 1.6) {
+                    m.speedFactor = 1.6;
+                    m.pitch = 1.2;                    // lying forward on the belly
+                } else {
+                    m.speedFactor = 0.7;
+                    m.roll = Math.sin(t * 10) * 0.15; // side-to-side waddle
+                }
+                break;
+            }
+
+            case 'pounce': { // tigers stalk crouched at 0.9x; within 9 units, pounce at 2.2x for 0.5s, then rest
+                ud.pounceTime = Math.max(0, (ud.pounceTime || 0) - dt);
+                ud.pounceCooldown = Math.max(0, (ud.pounceCooldown || 0) - dt);
+                if (isScared) ud.pounceTime = 0; // fleeing tigers don't pounce
+                const dist = snake.position.distanceTo(this.player.position);
+                if (!isScared && ud.pounceTime === 0 && ud.pounceCooldown === 0 && dist < 9) {
+                    ud.pounceTime = 0.5;
+                    ud.pounceCooldown = 3.0;
+                }
+                if (ud.pounceTime > 0) {
+                    m.speedFactor = 2.2;
+                    m.scaleY = 0.85; m.scaleZ = 1.25;   // stretched mid-leap
+                } else if (!isScared) {
+                    m.speedFactor = 0.9;
+                    m.scaleY = 0.85;                    // crouched, stalking
+                }
+                break;
+            }
+
+            case 'scuttle': // crabs walk sideways in quick pulses (0.4x to 1.6x, averages 1.0x)
+                m.speedFactor = 1 + 0.6 * Math.sin(t * 9);
+                m.yaw = Math.PI / 2;
+                break;
+        }
+        return m;
+    }
+
     animate(timestamp = 0) {
         requestAnimationFrame((ts) => this.animate(ts));
 
@@ -840,6 +1120,10 @@ class GameEngine {
         const deltaTime = Math.min((timestamp - gameState.lastTime) / 1000, MAX_DELTA_TIME);
         gameState.lastTime = timestamp;
         const frameScale = deltaTime * TUNING_FPS; // 1.0 at 60fps, 0.5 at 120fps
+
+        // Background effect keeps going even on the level-complete banner (snow keeps falling)
+        AmbientEffects.update(deltaTime, this.player.position);
+        Scenery.update(deltaTime, this.camera); // smoke and glowing lava keep going too
 
         if (gameState.gameState === 'START' || gameState.gameState === 'FINISHED') {
             this.pinkCoins.forEach(c => c.rotation.y += 0.05 * frameScale);

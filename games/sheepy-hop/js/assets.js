@@ -1186,7 +1186,117 @@ const ParticleSystem = {
     }
 };
 
+// Biome background effects (snowfall, embers, blowing sand, fireflies, pollen): one THREE.Points
+// cloud in a box that follows Sheepy. Particles wrap around the box edges, so the effect is
+// always on screen without spawning anything. Configured per level by `ambientEffect` in levels.js.
+const AmbientEffects = {
+    AREA: 50,          // half-width of the box around Sheepy (camera sees roughly ±30)
+    points: null,
+    config: null,
+    base: null,        // un-swayed positions, Float32Array of x,y,z
+    phase: null,       // per-particle random phase for sway/twinkle
+    time: 0,
+    dotTexture: (() => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        g.addColorStop(0, 'rgba(255,255,255,1)');
+        g.addColorStop(0.4, 'rgba(255,255,255,0.8)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 64, 64);
+        return new THREE.CanvasTexture(canvas);
+    })(),
+
+    create(scene, config, center) {
+        this.dispose();
+        if (!config) return;
+        this.config = config;
+        this.time = 0;
+
+        const n = config.count;
+        this.base = new Float32Array(n * 3);
+        this.phase = new Float32Array(n);
+        const cx = center ? center.x : 0, cz = center ? center.z : 0;
+        for (let i = 0; i < n; i++) {
+            this.base[i * 3] = cx + (Math.random() * 2 - 1) * this.AREA;
+            this.base[i * 3 + 1] = config.heightMin + Math.random() * (config.heightMax - config.heightMin);
+            this.base[i * 3 + 2] = cz + (Math.random() * 2 - 1) * this.AREA;
+            this.phase[i] = Math.random() * Math.PI * 2;
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.base), 3));
+        if (config.twinkle) {
+            geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+        }
+        const material = new THREE.PointsMaterial({
+            size: config.size,
+            map: this.dotTexture,
+            color: config.twinkle ? 0xffffff : config.color, // twinkling particles take their colour per particle
+            vertexColors: !!config.twinkle,
+            transparent: true,
+            opacity: config.opacity,
+            depthWrite: false,
+            blending: config.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+            sizeAttenuation: true
+        });
+        this.points = new THREE.Points(geometry, material);
+        this.points.frustumCulled = false; // positions move with Sheepy, so the cached bounds would be wrong
+        scene.add(this.points);
+        this.update(0, center);
+    },
+
+    // deltaTime in seconds; center = Sheepy's position
+    update(deltaTime, center) {
+        if (!this.points) return;
+        const c = this.config, n = c.count, A = this.AREA;
+        const [vx, vy, vz] = c.velocity;
+        const span = c.heightMax - c.heightMin;
+        this.time += deltaTime;
+        const pos = this.points.geometry.attributes.position.array;
+        const col = c.twinkle ? this.points.geometry.attributes.color.array : null;
+        const baseColor = c.twinkle ? new THREE.Color(c.color) : null;
+        const cx = center ? center.x : 0, cz = center ? center.z : 0;
+
+        for (let i = 0; i < n; i++) {
+            const k = i * 3;
+            let x = this.base[k] + vx * deltaTime;
+            let y = this.base[k + 1] + vy * deltaTime;
+            let z = this.base[k + 2] + vz * deltaTime;
+            // Wrap inside the box around Sheepy
+            if (x - cx > A) x -= 2 * A; else if (x - cx < -A) x += 2 * A;
+            if (z - cz > A) z -= 2 * A; else if (z - cz < -A) z += 2 * A;
+            if (y > c.heightMax) y -= span; else if (y < c.heightMin) y += span;
+            this.base[k] = x; this.base[k + 1] = y; this.base[k + 2] = z;
+
+            const p = this.phase[i];
+            const swayX = c.sway ? Math.sin(this.time * 1.3 + p) * c.sway : 0;
+            const swayZ = c.sway ? Math.cos(this.time * 1.1 + p * 1.7) * c.sway : 0;
+            pos[k] = x + swayX; pos[k + 1] = y; pos[k + 2] = z + swayZ;
+
+            if (col) {
+                const glow = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(this.time * (2 + (p % 1.5)) + p * 3));
+                col[k] = baseColor.r * glow; col[k + 1] = baseColor.g * glow; col[k + 2] = baseColor.b * glow;
+            }
+        }
+        this.points.geometry.attributes.position.needsUpdate = true;
+        if (col) this.points.geometry.attributes.color.needsUpdate = true;
+    },
+
+    dispose() {
+        if (this.points) {
+            if (this.points.parent) this.points.parent.remove(this.points);
+            this.points.geometry.dispose();
+            this.points.material.dispose();
+        }
+        this.points = null;
+        this.config = null;
+    }
+};
+
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { TextureGenerator, ModelCreator, ParticleSystem };
+    module.exports = { TextureGenerator, ModelCreator, ParticleSystem, AmbientEffects };
 }
