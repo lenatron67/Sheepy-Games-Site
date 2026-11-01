@@ -738,8 +738,6 @@ class GameEngine {
         const wallSteerStart = enemyLimit - WALL_STEER_MARGIN;
 
         for (let snake of this.snakes) {
-            if (!snake.visible) continue; // "eaten" and respawning
-
             // 1. Determine target based on AI type and Sheepy Mode
             const isScared = gameState.isSheepy;
             let targetPos = new THREE.Vector3();
@@ -791,6 +789,9 @@ class GameEngine {
             const overZ = Math.abs(snake.position.z) - wallSteerStart;
             if (overZ > 0) desiredVelocity.z -= Math.sign(snake.position.z) * 2 * Math.min(overZ / WALL_STEER_MARGIN, 1);
 
+            // Enemies move along the ground: ignore height differences, otherwise a hovering
+            // Sheepy right above an enemy makes it steer "down" (slow to flee, and tilted nose-down)
+            desiredVelocity.y = 0;
             desiredVelocity.normalize();
 
             // Smoothly adjust current velocity to desired velocity
@@ -824,23 +825,10 @@ class GameEngine {
                 snake.userData.isScared = false;
             }
 
-            // 4. Player Collision Detection
-            if (this.player.position.distanceTo(snake.position) < 2) {
-                if (isScared) {
-                    // Eat the snake!
-                    gameState.score += 200;
-                    audioManager.playBlop();
-
-                    // Temporary hide + respawn mechanism
-                    snake.visible = false;
-                    setTimeout(() => {
-                        snake.position.copy(snake.userData.home);
-                        snake.visible = true;
-                    }, 5000);
-                } else {
-                    // Damage player
-                    this.playerTakeDamage();
-                }
+            // 4. Player Collision Detection: hunting enemies hurt the player.
+            // Scared enemies (Sheepy mode) just run away; touching them does nothing.
+            if (!isScared && this.player.position.distanceTo(snake.position) < 2) {
+                this.playerTakeDamage();
             }
         }
     }
