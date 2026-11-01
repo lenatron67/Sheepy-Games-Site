@@ -1157,13 +1157,14 @@ const ParticleSystem = {
         return mesh;
     },
 
-    updateParticles() {
+    // frameScale: 1.0 at 60fps (values below are tuned per 60fps frame)
+    updateParticles(frameScale = 1) {
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
-            p.life -= 0.03;
-            p.mesh.position.add(p.velocity);
-            p.mesh.rotation.x += 0.2;
-            p.mesh.rotation.z += 0.2;
+            p.life -= 0.03 * frameScale;
+            p.mesh.position.addScaledVector(p.velocity, frameScale);
+            p.mesh.rotation.x += 0.2 * frameScale;
+            p.mesh.rotation.z += 0.2 * frameScale;
             p.mesh.scale.setScalar(p.life);
 
             if (p.life <= 0) {

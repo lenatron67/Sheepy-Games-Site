@@ -1,5 +1,19 @@
 // Main Three.js engine and Game Loop
 
+// Movement and physics values in this file are tuned as "amount per frame at 60fps".
+// Each frame they're multiplied by frameScale (deltaTime * TUNING_FPS) so the game plays
+// at the same speed on 60, 90 and 120Hz screens.
+const TUNING_FPS = 60;
+
+// Longest timestep a single frame may apply. Without this, resuming after the app was
+// backgrounded would apply seconds of movement (and bonus-round time) in one frame.
+const MAX_DELTA_TIME = 0.1;
+
+// Frame-rate-independent version of a per-frame lerp factor (e.g. 0.05 = "close 5% of the gap each 60fps frame")
+function frameLerpAlpha(alphaPerFrame, frameScale) {
+    return 1 - Math.pow(1 - alphaPerFrame, frameScale);
+}
+
 // Global game engine instance
 let gameEngine = null;
 
@@ -25,6 +39,7 @@ class GameEngine {
         this.joyIn = { x: 0, y: 0 };
         this.touchId = null;
         this.uiElements = {};
+        this.sparkBudget = 0; // fractional sparks carried between frames (Sheepy-mode trail)
 
         this.init();
     }
@@ -360,7 +375,7 @@ class GameEngine {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    updatePlayerMovement(deltaTime) {
+    updatePlayerMovement(frameScale) {
         let dx = 0, dz = 0;
 
         if (this.keys['w'] || this.keys['ArrowUp']) dz = -1;
@@ -379,7 +394,7 @@ class GameEngine {
             dz = this.joyIn.y;
         }
 
-        const speed = gameState.getPlayerSpeed();
+        const speed = gameState.getPlayerSpeed() * frameScale;
         let moveX = dx * speed;
         let moveZ = dz * speed;
 
@@ -422,8 +437,8 @@ class GameEngine {
         }
 
         if (gameState.gameState === 'PLAYING' && !gameState.isSheepy) {
-            this.player.position.y += gameState.playerVelY;
-            gameState.playerVelY -= 0.04;
+            this.player.position.y += gameState.playerVelY * frameScale;
+            gameState.playerVelY -= 0.04 * frameScale;
             if (this.player.position.y < 0) {
                 this.player.position.y = 0;
                 gameState.playerVelY = 0;
@@ -432,11 +447,15 @@ class GameEngine {
 
         if (gameState.isSheepy) {
             const targetY = 6 + Math.sin(Date.now() * 0.003) * 0.5;
-            this.player.position.y = THREE.MathUtils.lerp(this.player.position.y, targetY, 0.05);
+            this.player.position.y = THREE.MathUtils.lerp(this.player.position.y, targetY, frameLerpAlpha(0.05, frameScale));
 
             if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
-                ParticleSystem.spawnSpark(this.player.position, dx, dz);
-                ParticleSystem.spawnSpark(this.player.position, dx, dz);
+                // 2 sparks per 60fps frame (120/sec), regardless of refresh rate
+                this.sparkBudget += 2 * frameScale;
+                while (this.sparkBudget >= 1) {
+                    ParticleSystem.spawnSpark(this.player.position, dx, dz);
+                    this.sparkBudget -= 1;
+                }
             }
         }
 
@@ -445,12 +464,12 @@ class GameEngine {
         }
     }
 
-    updateCoins() {
+    updateCoins(frameScale) {
         // Only check pink coins if player is not sheepy (phases 1 and 3)
         if (!gameState.isSheepy) {
             for (let i = this.pinkCoins.length - 1; i >= 0; i--) {
                 const coin = this.pinkCoins[i];
-                coin.rotation.y += 0.05;
+                coin.rotation.y += 0.05 * frameScale;
 
                 if (this.player.position.distanceTo(coin.position) < 2) {
                     this.scene.remove(coin);
@@ -466,7 +485,7 @@ class GameEngine {
         if (gameState.isSheepy) {
             for (let i = this.goldCoins.length - 1; i >= 0; i--) {
                 const coin = this.goldCoins[i];
-                coin.rotation.y += 0.05;
+                coin.rotation.y += 0.05 * frameScale;
 
                 if (this.player.position.distanceTo(coin.position) < 5) {
                     this.scene.remove(coin);
@@ -479,7 +498,7 @@ class GameEngine {
         }
     }
 
-    updateBonusLevel(timestamp, deltaTime) {
+    updateBonusLevel(timestamp, deltaTime, frameScale) {
         if (timestamp - gameState.lastRaspberryTime > LEVELS.BONUS.RASPBERRY_SPAWN_INTERVAL) {
             const levelName = gameState.currentLevelName;
             const level = LEVELS[levelName] || LEVELS.MAIN;
@@ -499,11 +518,12 @@ class GameEngine {
             const r = this.raspberries[i];
 
             if (r.position.y > LEVELS.BONUS.RASPBERRY_FINAL_HEIGHT) {
-                r.position.y -= LEVELS.BONUS.RASPBERRY_FALL_SPEED;
-                r.rotation.x += 0.05;
-                r.rotation.z += 0.05;
-            } else {
-                r.position.y = LEVELS.BONUS.RASPBERRY_FINAL_HEIGHT;
+                r.position.y = Math.max(
+                    LEVELS.BONUS.RASPBERRY_FINAL_HEIGHT,
+                    r.position.y - LEVELS.BONUS.RASPBERRY_FALL_SPEED * frameScale
+                );
+                r.rotation.x += 0.05 * frameScale;
+                r.rotation.z += 0.05 * frameScale;
             }
 
             if (r.position.distanceTo(this.player.position) < LEVELS.BONUS.RASPBERRY_COLLISION_DISTANCE) {
@@ -520,14 +540,14 @@ class GameEngine {
         }
     }
 
-    updateCamera() {
+    updateCamera(frameScale) {
         const targetPosition = new THREE.Vector3(
             this.player.position.x,
             gameState.getCameraHeight(),
             this.player.position.z + gameState.getCameraDistance()
         );
 
-        this.camera.position.lerp(targetPosition, 0.05);
+        this.camera.position.lerp(targetPosition, frameLerpAlpha(0.05, frameScale));
         this.camera.lookAt(this.player.position);
     }
 
@@ -636,6 +656,7 @@ class GameEngine {
         this.keys = {};
         this.touchId = null;
         this.joyIn = { x: 0, y: 0 };
+        this.sparkBudget = 0;
 
         gameState.init(audioManager, this, levelName, resetLives);
         const sky = LEVELS[levelName].skyColor;
@@ -710,6 +731,12 @@ class GameEngine {
         const playerHeading = new THREE.Vector3(this.joyIn.x, 0, this.joyIn.y).normalize();
         if (playerHeading.lengthSq() < 0.1) playerHeading.set(0, 0, 1);
 
+        // The fence is a square at ±WORLD_SIZE/2. Enemies start steering away WALL_STEER_MARGIN
+        // units before their limit, and are hard-clamped to it after moving.
+        const enemyLimit = (LEVELS[gameState.currentLevelName].WORLD_SIZE / 2) - 2;
+        const WALL_STEER_MARGIN = 8;
+        const wallSteerStart = enemyLimit - WALL_STEER_MARGIN;
+
         for (let snake of this.snakes) {
             if (!snake.visible) continue; // "eaten" and respawning
 
@@ -756,12 +783,13 @@ class GameEngine {
                 }
             }
 
-            // Boundary avoidance
-            const distFromOrigin = Math.sqrt(snake.position.x ** 2 + snake.position.z ** 2);
-            if (distFromOrigin > LEVELS[gameState.currentLevelName].WORLD_SIZE - 2) {
-                const centerPull = new THREE.Vector3(0, 0, 0).sub(snake.position).normalize();
-                desiredVelocity.add(centerPull);
-            }
+            // Boundary avoidance: push away from each fence wall, ramping up to 2x as the enemy
+            // reaches its limit. That outweighs the (unit-length) chase/flee direction, so a fleeing
+            // enemy slides along the fence instead of pressing into it.
+            const overX = Math.abs(snake.position.x) - wallSteerStart;
+            if (overX > 0) desiredVelocity.x -= Math.sign(snake.position.x) * 2 * Math.min(overX / WALL_STEER_MARGIN, 1);
+            const overZ = Math.abs(snake.position.z) - wallSteerStart;
+            if (overZ > 0) desiredVelocity.z -= Math.sign(snake.position.z) * 2 * Math.min(overZ / WALL_STEER_MARGIN, 1);
 
             desiredVelocity.normalize();
 
@@ -773,6 +801,10 @@ class GameEngine {
 
             // Move snake
             snake.position.addScaledVector(snake.userData.velocity, currentSpeed * deltaTime);
+
+            // Never let an enemy through the fence, even if steering loses the argument
+            snake.position.x = Math.max(-enemyLimit, Math.min(enemyLimit, snake.position.x));
+            snake.position.z = Math.max(-enemyLimit, Math.min(enemyLimit, snake.position.z));
 
             // Keep grounded
             snake.position.y = 0.5;
@@ -817,26 +849,26 @@ class GameEngine {
         requestAnimationFrame((ts) => this.animate(ts));
 
         if (!gameState.lastTime) gameState.lastTime = timestamp;
-        const deltaTime = (timestamp - gameState.lastTime) / 1000;
+        const deltaTime = Math.min((timestamp - gameState.lastTime) / 1000, MAX_DELTA_TIME);
         gameState.lastTime = timestamp;
+        const frameScale = deltaTime * TUNING_FPS; // 1.0 at 60fps, 0.5 at 120fps
 
         if (gameState.gameState === 'START' || gameState.gameState === 'FINISHED') {
-            this.pinkCoins.forEach(c => c.rotation.y += 0.05);
+            this.pinkCoins.forEach(c => c.rotation.y += 0.05 * frameScale);
             this.renderer.render(this.scene, this.camera);
             return;
         }
 
-        this.updatePlayerMovement(deltaTime);
-        this.updateCoins();
-        ParticleSystem.updateParticles();
+        this.updatePlayerMovement(frameScale);
+        this.updateCoins(frameScale);
+        ParticleSystem.updateParticles(frameScale);
         this.updateSnakes(deltaTime);
 
-
         if (gameState.gameState === 'BONUS') {
-            this.updateBonusLevel(timestamp, deltaTime);
+            this.updateBonusLevel(timestamp, deltaTime, frameScale);
         }
 
-        this.updateCamera();
+        this.updateCamera(frameScale);
         this.renderer.render(this.scene, this.camera);
     }
 }
