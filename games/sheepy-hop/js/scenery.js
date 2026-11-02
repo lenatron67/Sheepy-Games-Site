@@ -266,8 +266,8 @@ function addSmoke(group, { x = 0, y, z = 0, count, life, rise, drift, size, grow
 
 // A winding path from the front (south side) of a biome's first landmark towards the middle of
 // the map, as a ground ribbon. Returns the mesh, with keepClear circles along it so obstacles
-// don't spawn on it.
-function pathFromLandmark(level, texture, width) {
+// don't spawn on it. taper: share of its length over which the end narrows to nothing.
+function pathFromLandmark(level, texture, width, taper = 0.25) {
     const l = level.landmarks[0];
     const front = l.halfSize !== undefined ? l.halfSize : l.radius;
     const start = new THREE.Vector3(l.x, 0, l.z + front + 0.5);
@@ -279,7 +279,7 @@ function pathFromLandmark(level, texture, width) {
     [0.3, 0.55, 0.8, 1].forEach(t => points.push(new THREE.Vector3(start.x + dx * t, 0, start.z + dz * t)
         .addScaledVector(side, Math.sin(t * Math.PI * 2) * 4)));
 
-    const geo = buildGroundRibbon(points, width, width * 2, 0.025, 0.25);
+    const geo = buildGroundRibbon(points, width, width * 2, 0.025, taper);
     const mesh = new THREE.Mesh(geo, makeDecalMaterial(texture, 'lit'));
     mesh.receiveShadow = true;
     mesh.userData.disposables = [geo, mesh.material];
@@ -1037,6 +1037,141 @@ const SceneryModels = {
 
     // Jungle Jumble second landmark: a giant stone head, half swallowed by the jungle, with a
     // mossy crown, vines and bushes. Faces south (towards the camera). 7 units across, 7.5 high.
+    // Seashell Shore landmark: a red-and-white lighthouse on a rocky base, door facing south, its
+    // lamp glowing. 9 units across at the rocks, 15 high. Solid radius in levels.js.
+    createLighthouse() {
+        const parts = sceneryCached('lighthouse', () => {
+            const BASE = 0.8, TOWER = 10.5, R0 = 2.4, R1 = 1.5; // the tower narrows from R0 to R1
+            const TOP = BASE + TOWER;
+            const IRON = '#2f2f2f', WINDOW = '#2d4a6a';
+            const radiusAt = y => R0 + (R1 - R0) * Math.min(1, Math.max(0, (y - BASE) / TOWER));
+            const pieces = [];
+            // Rocks round the foot, leaving the door clear
+            const ROCKS = ['#7d7a74', '#6e6b66', '#8a8780'];
+            const LUMP = new THREE.DodecahedronGeometry(1, 0);
+            for (let i = 0; i < 10; i++) {
+                const a = (i / 10) * Math.PI * 2 + 0.31;
+                if (Math.cos(a) > 0.8) continue; // the front, where the door is
+                const s = 0.9 + ((i * 37) % 10) / 10 * 0.5;
+                pieces.push({ geo: LUMP, color: ROCKS[i % 3], pos: [Math.sin(a) * 3.2, 0.25, Math.cos(a) * 3.2], scale: [s, s * 0.7, s], rot: [i, i * 2, 0] });
+            }
+            pieces.push({ geo: new THREE.CylinderGeometry(R0 + 0.5, R0 + 0.7, BASE, 12), color: '#a8a39a', pos: [0, BASE / 2, 0] });
+            // The tower, in five red and white bands
+            const BANDS = 5;
+            for (let b = 0; b < BANDS; b++) {
+                const y0 = BASE + TOWER * b / BANDS, y1 = BASE + TOWER * (b + 1) / BANDS;
+                pieces.push({ geo: new THREE.CylinderGeometry(radiusAt(y1), radiusAt(y0), y1 - y0, 14), color: b % 2 ? '#f4f1ea' : '#d63a2f', pos: [0, (y0 + y1) / 2, 0] });
+            }
+            // Door and two little windows, facing south
+            pieces.push({ geo: new THREE.BoxGeometry(1.1, 1.9, 0.4), color: WINDOW, pos: [0, BASE + 0.95, radiusAt(BASE + 0.95) - 0.1] });
+            [4.2, 7.6].forEach(y => pieces.push({ geo: new THREE.BoxGeometry(0.55, 0.8, 0.3), color: WINDOW, pos: [0, BASE + y, radiusAt(BASE + y) - 0.05] }));
+            // Gallery with its railing, the lantern room's frame, and a red roof
+            pieces.push({ geo: new THREE.CylinderGeometry(R1 + 0.7, R1 + 0.5, 0.35, 14), color: IRON, pos: [0, TOP + 0.17, 0] });
+            for (let k = 0; k < 14; k++) {
+                const a = (k / 14) * Math.PI * 2;
+                pieces.push({ geo: new THREE.BoxGeometry(0.08, 0.7, 0.08), color: IRON, pos: [Math.sin(a) * (R1 + 0.6), TOP + 0.7, Math.cos(a) * (R1 + 0.6)] });
+            }
+            pieces.push({ geo: new THREE.TorusGeometry(R1 + 0.6, 0.05, 4, 28), color: IRON, pos: [0, TOP + 1.05, 0], rot: [Math.PI / 2, 0, 0] });
+            for (let k = 0; k < 6; k++) {
+                const a = (k / 6) * Math.PI * 2;
+                pieces.push({ geo: new THREE.BoxGeometry(0.12, 1.7, 0.12), color: IRON, pos: [Math.sin(a) * 1.12, TOP + 1.2, Math.cos(a) * 1.12] });
+            }
+            pieces.push({ geo: new THREE.CylinderGeometry(1.3, 1.3, 0.2, 14), color: IRON, pos: [0, TOP + 2.1, 0] });
+            pieces.push({ geo: new THREE.ConeGeometry(1.6, 1.4, 14), color: '#c8352b', pos: [0, TOP + 2.9, 0] });
+            pieces.push({ geo: new THREE.SphereGeometry(0.22, 8, 6), color: IRON, pos: [0, TOP + 3.7, 0] });
+            return {
+                body: mergePieces(pieces),
+                lamp: new THREE.CylinderGeometry(0.95, 0.95, 1.5, 14),
+                lampMat: new THREE.MeshBasicMaterial({ color: 0xfff2a0 }), // unlit, so it glows
+                lampY: TOP + 1.2
+            };
+        });
+
+        const group = new THREE.Group();
+        const body = new THREE.Mesh(parts.body, vertexColourMaterial());
+        body.castShadow = true;
+        group.add(body);
+        const lamp = new THREE.Mesh(parts.lamp, parts.lampMat);
+        lamp.position.y = parts.lampY;
+        group.add(lamp);
+        return group;
+    },
+
+    // Seashell Shore ground detail: a wooden boardwalk from the lighthouse door towards the middle
+    createBoardwalk(level, solids) {
+        const texture = sceneryCached('boardwalkTex', () => {
+            const W = 128, H = 256, PLANKS = 8;
+            const [canvas, ctx] = makeCanvas(W, H);
+            for (let k = 0; k < PLANKS; k++) {
+                const y = k * H / PLANKS, h = H / PLANKS;
+                const n = Math.floor(Math.random() * 20);
+                ctx.fillStyle = `rgb(${176 + n}, ${132 + n}, ${86 + n})`;
+                ctx.fillRect(0, y, W, h);
+                for (let g = 0; g < 5; g++) { // wood grain along the plank
+                    ctx.strokeStyle = Math.random() < 0.5 ? 'rgba(120, 80, 40, 0.35)' : 'rgba(230, 200, 150, 0.35)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    const gy = y + 4 + Math.random() * (h - 8);
+                    ctx.moveTo(0, gy);
+                    ctx.bezierCurveTo(W * 0.3, gy + 2, W * 0.6, gy - 2, W, gy);
+                    ctx.stroke();
+                }
+                ctx.fillStyle = '#4e3520'; // gap between planks
+                ctx.fillRect(0, y, W, 3);
+                ctx.fillStyle = '#3a2a1a'; // nails at each end
+                [10, W - 10].forEach(x => { ctx.beginPath(); ctx.arc(x, y + h / 2, 2, 0, Math.PI * 2); ctx.fill(); });
+            }
+            ctx.fillStyle = '#7a5532'; // the boards it rests on, along each edge
+            ctx.fillRect(0, 0, 6, H);
+            ctx.fillRect(W - 6, 0, 6, H);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        });
+        return pathFromLandmark(level, texture, 3.0, 0.02); // a boardwalk ends square, not in a point
+    },
+
+    // Seashell Shore second landmark: an old wooden rowing boat beached on the sand, tipped a
+    // little onto its side, with its oars and a coil of rope. Lies north-south, 8 long, so it can
+    // be solid as three circles along the hull (userData.colliders).
+    createRowingBoat() {
+        const parts = sceneryCached('rowingBoat', () => {
+            const WOOD = '#9a6a3e', DARK = '#6e4a2a', PAINT = '#3f7fb5';
+            const B = new THREE.BoxGeometry(1, 1, 1);
+            const OAR = new THREE.CylinderGeometry(0.07, 0.07, 3.2, 6);
+            const boat = [
+                // Hull: the bottom half of a stretched sphere, open at the top
+                { geo: new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), color: PAINT, pos: [0, 1.0, 0], scale: [1.6, 1.0, 4.0] },
+                { geo: new THREE.TorusGeometry(1, 0.09, 4, 32), color: WOOD, pos: [0, 1.0, 0], rot: [Math.PI / 2, 0, 0], scale: [1.6, 4.0, 1] },
+                { geo: B, color: DARK, pos: [0, 0.32, 0], scale: [1.9, 0.06, 5.0] },   // floor boards
+                { geo: B, color: WOOD, pos: [0, 0.85, -1.2], scale: [2.6, 0.12, 0.45] }, // seats
+                { geo: B, color: WOOD, pos: [0, 0.85, 1.1], scale: [2.6, 0.12, 0.45] },
+                // An oar resting across the seats
+                { geo: OAR, color: WOOD, pos: [0.3, 1.0, -0.1], rot: [Math.PI / 2, 0, 0.1] },
+                { geo: B, color: WOOD, pos: [0.3, 1.0, 1.65], scale: [0.4, 0.06, 0.9] }
+            ];
+            // Lying flat on the sand (not tipped with the boat): the other oar, and a coil of rope by the bow
+            const sand = [
+                { geo: OAR, color: WOOD, pos: [2.4, 0.08, 0.4], rot: [Math.PI / 2, 0, 0.35] },
+                { geo: B, color: WOOD, pos: [2.95, 0.05, 2.0], scale: [0.4, 0.06, 0.9], rot: [0, 0.35, 0] },
+                { geo: new THREE.TorusGeometry(0.4, 0.1, 5, 14), color: '#d8c49a', pos: [-1.1, 0.1, 4.4], rot: [Math.PI / 2, 0, 0] },
+                { geo: new THREE.TorusGeometry(0.28, 0.09, 5, 12), color: '#cbb68a', pos: [-1.1, 0.25, 4.4], rot: [Math.PI / 2, 0, 0] }
+            ];
+            return { boat: mergePieces(boat), sand: mergePieces(sand) };
+        });
+
+        const group = new THREE.Group();
+        const boat = new THREE.Mesh(parts.boat, vertexColourMaterialDoubleSided());
+        boat.rotation.z = 0.22; // tipped onto its side a little
+        boat.castShadow = true;
+        group.add(boat);
+        const sand = new THREE.Mesh(parts.sand, vertexColourMaterial());
+        sand.castShadow = true;
+        group.add(sand);
+        group.userData.colliders = [-2.6, 0, 2.6].map(z => ({ x: 0, z, radius: 1.6 }));
+        return group;
+    },
+
     createStoneHead() {
         const geo = sceneryCached('stoneHead', () => {
             const BALL = new THREE.SphereGeometry(1, 8, 6); // low-poly ball, squashed into each shape
@@ -1080,6 +1215,15 @@ const SceneryModels = {
         return group;
     }
 };
+
+// Double-sided copy of the landmark material, for open shapes you can see into (the rowing boat)
+function vertexColourMaterialDoubleSided() {
+    return sceneryCached('vertexColourMatDouble', () => {
+        const m = vertexColourMaterial().clone();
+        m.side = THREE.DoubleSide;
+        return m;
+    });
+}
 
 // Builds, animates and clears the current biome's scenery, and answers collision questions about
 // landmarks. A model can animate through userData.update(deltaTime, time, camera), list what to

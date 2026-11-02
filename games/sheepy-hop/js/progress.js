@@ -1,6 +1,14 @@
 // Saved progress: which worlds are unlocked, and each world's best score.
 // Stored in localStorage on this device only (the website and the Android app each keep their own).
 // Needs LEVEL_ORDER from levels.js.
+//
+// Saved as { furthest: name of the furthest world reached, unlocked: count, best: { name: score } }.
+// Every world up to `furthest` in LEVEL_ORDER is open, so a new world added earlier in the order
+// opens up for players who are already past it, and nobody loses a world they had reached.
+// Saves from before 2026-11 only had `unlocked` (a count of worlds open in the original order).
+
+// The world order those older saves counted in
+const PROGRESS_ORIGINAL_ORDER = ['MAIN', 'DESERT', 'SNOW', 'JUNGLE', 'VOLCANO'];
 
 const Progress = {
     STORAGE_KEY: 'sheepy_hop_progress',
@@ -14,7 +22,14 @@ const Progress = {
         } catch (e) {
             saved = null; // storage blocked or corrupt: start fresh
         }
-        const unlocked = saved && Number.isInteger(saved.unlocked) ? saved.unlocked : 1;
+        let furthest = saved && typeof saved.furthest === 'string' ? saved.furthest : null;
+        if (!furthest && saved && Number.isInteger(saved.unlocked)) { // older save: convert its count
+            furthest = PROGRESS_ORIGINAL_ORDER[Math.max(1, Math.min(PROGRESS_ORIGINAL_ORDER.length, saved.unlocked)) - 1];
+        }
+        // Count of worlds open, from the first. If the furthest world has left the game, fall back
+        // on the saved count.
+        let unlocked = LEVEL_ORDER.indexOf(furthest) + 1;
+        if (!unlocked) unlocked = saved && Number.isInteger(saved.unlocked) ? saved.unlocked : 1;
         const best = {};
         if (saved && saved.best && typeof saved.best === 'object') {
             for (const name of LEVEL_ORDER) {
@@ -30,7 +45,12 @@ const Progress = {
 
     save() {
         try {
-            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.data));
+            const d = this.data;
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify({
+                furthest: LEVEL_ORDER[d.unlocked - 1],
+                unlocked: d.unlocked,
+                best: d.best
+            }));
         } catch (e) {
             // Storage unavailable (e.g. private browsing): progress lasts for this session only
         }

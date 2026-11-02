@@ -50,7 +50,7 @@ class GameEngine {
     }
 
     init() {
-        // Playtesting: change to 'DESERT','SNOW','JUNGLE','VOLCANO' to start on that level. Set back to 'MAIN' for release.
+        // Playtesting: change to another world's name (see LEVEL_ORDER) to start there. Set back to 'MAIN' for release.
         gameState.init(audioManager, this, 'MAIN');
         this.createScene();
         this.createLighting();
@@ -457,8 +457,10 @@ class GameEngine {
 
         const points = LEVEL_ORDER.map((name, i) => ({
             x: i % 2 === 0 ? 34 : 64,              // percent across
-            y: 86 - i * (68 / Math.max(1, n - 1))  // percent down
+            y: 87 - i * (71 / Math.max(1, n - 1))  // percent down
         }));
+        // Past six worlds, the buttons shrink a little so they still fit on a phone (to 82% at nine)
+        panel.style.setProperty('--node-scale', Math.min(1, Math.max(0.75, 1 - (n - 6) * 0.06)).toFixed(2));
 
         // Dotted S-curve linking the worlds
         let d = `M ${points[0].x} ${points[0].y}`;
@@ -1011,7 +1013,7 @@ class GameEngine {
             // Speed: world speed x lap/phase scaling, halved while fleeing
             const baseSpeed = snake.userData.speed * speedScale * (isScared ? 0.5 : 1);
 
-            // Biome movement rhythm (weave / slide / pounce / scuttle) at about the same average speed
+            // Biome movement rhythm (weave / slide / pounce / scuttle / swoop) at about the same average speed
             const motion = this.enemyMotion(snake, behaviour, deltaTime, isScared);
             const vel = snake.userData.velocity;
             const side = new THREE.Vector3(-vel.z, 0, vel.x);
@@ -1114,6 +1116,29 @@ class GameEngine {
                 m.speedFactor = 1 + 0.6 * Math.sin(t * 9);
                 m.yaw = Math.PI / 2;
                 break;
+
+            case 'swoop': { // seagulls waddle 2.4s at 0.75x, then spread their wings and swoop 0.6s at 2x (averages 1.0x)
+                const c = t % 3.0;
+                let spread = 0, lift = 0;
+                if (c >= 2.4) {
+                    const s = (c - 2.4) / 0.6;           // 0 to 1 through the swoop
+                    m.speedFactor = 2.0;
+                    m.pitch = 0.15;                      // leaning into it
+                    spread = Math.min(1, Math.sin(Math.PI * s) * 2);
+                    lift = Math.sin(Math.PI * s) * 0.6;  // skims up off the sand and back down
+                } else {
+                    m.speedFactor = 0.75;
+                    m.roll = Math.sin(t * 9) * 0.12;     // side-to-side waddle
+                }
+                // The model lifts and opens its wings itself, so the enemy's position (and so its
+                // collision with Sheepy) is the same as any other enemy's
+                if (ud.bird) ud.bird.position.y = -0.5 + lift;
+                if (ud.wings) {
+                    ud.wings[0].rotation.z = -spread * 1.4;
+                    ud.wings[1].rotation.z = spread * 1.4;
+                }
+                break;
+            }
         }
         return m;
     }

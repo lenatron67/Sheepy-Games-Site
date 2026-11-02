@@ -1,4 +1,4 @@
-const LEVEL_ORDER = ['MAIN', 'DESERT', 'SNOW', 'JUNGLE', 'VOLCANO'];
+const LEVEL_ORDER = ['MAIN', 'BEACH', 'DESERT', 'SNOW', 'JUNGLE', 'VOLCANO'];
 
 // Enemy difficulty scaling on top of each world's enemySpeed:
 //   +10% for every lap of all the worlds (lap 2 = +10%, lap 3 = +20%, ...)
@@ -11,7 +11,8 @@ const ENEMY_SCALING = {
 // Level definitions and configurations.
 //
 // Per-biome look and feel:
-//   biomeName / icon / mapColor  - shown on the level splash and the world map
+//   biomeName / icon / mapColor  - shown on the level splash and the world map (the "LEVEL n" above the
+//                                  name comes from the world's place in LEVEL_ORDER)
 //   atmosphere                   - sky/fog colour comes from skyColor; light colours and strengths, fog distances
 //   ambientEffect                - floating particles around Sheepy (snow, embers, sand, fireflies, pollen):
 //                                  velocity is units/sec, sway is how far each particle wobbles,
@@ -33,10 +34,10 @@ const ENEMY_SCALING = {
 //   enemyBehaviour gives each biome its own movement rhythm at about the same average speed:
 //     weave   - slithers side to side          slide  - waddles, then belly-slides in fast bursts
 //     pounce  - stalks slowly, pounces when close     scuttle - moves sideways in quick pulses
+//     swoop   - waddles, then spreads its wings and swoops fast (the model needs userData.bird and wings)
 const LEVELS = {
     MAIN: {
         // Theme metadata
-        displayName: 'LEVEL 1',
         biomeName: 'Sunny Meadow',
         icon: '🌳',
         mapColor: '#4caf50',
@@ -90,9 +91,63 @@ const LEVELS = {
         TREE_EXCLUSION_ZONE: 5
     },
 
+    BEACH: {
+        // Theme metadata
+        biomeName: 'Seashell Shore',
+        icon: '🐚',
+        mapColor: '#7fd3e8',
+        skyColor: 0xa8e0f5,
+        groundType: 'generateBeachTexture',
+        primaryCoinModel: 'createSeashell',
+        primaryCoinName: 'Seashells',
+        primaryCoinLabel: 'Shells: ',
+        primaryCoinColor: '#ff9a8a',
+        goldCoinModel: 'createStarfish',
+        goldCoinName: 'Gold Starfish',
+        goldCoinColor: '#FFD700',
+        obstacleModel: 'createBeachObstacle',
+        bonusItemModel: 'createBeachBall',
+        hasEnemies: true,
+        enemyModel: 'createSeagull',
+        enemyTypes: ['BLINKY', 'PINKY'],
+        enemyColors: [0xff3333, 0xff88ff],
+        enemySpeed: 5.67,
+        enemyBehaviour: 'swoop',
+        atmosphere: {
+            ambientColor: 0xffffff, ambientIntensity: 0.62,
+            sunColor: 0xfff6e0, sunIntensity: 0.9,
+            fogNear: 25, fogFar: 70
+        },
+        ambientEffect: { // sunlight glinting on a sea breeze
+            count: 110, color: 0xffffff, size: 0.22, opacity: 0.8,
+            heightMin: 0.5, heightMax: 6, velocity: [0.6, 0.15, 1.2], sway: 0.5, twinkle: true, additive: true
+        },
+        // A lighthouse on the north edge with a boardwalk from its door, and a beached rowing boat on
+        // the west edge. The sea is past the north fence (see outskirts.js).
+        landmarks: [
+            { model: 'createLighthouse', x: 0, z: -49, radius: 4.6 },
+            { model: 'createRowingBoat', x: -47, z: 2 }
+        ],
+        groundDetail: 'createBoardwalk',
+        outskirts: 'beach',
+        music: { // a bouncy seaside tune in C
+            melody: 'C4 - E4 G4 - E4 G4 A4 G4 - E4 C4 D4 - E4 - F4 - A4 C5 - A4 G4 F4 E4 G4 - E4 D4 - C4 -',
+            bass: ['C3', 'C3', 'F2', 'G2'], tempo: 0.14, wave: 'triangle', gain: 0.1, drums: 'standard'
+        },
+        // World config
+        PINK_COINS_COUNT: 20,
+        GOLD_COINS_COUNT: 10,
+        TREES_COUNT: 50,
+        WORLD_SIZE: 160,
+        SMALL_WORLD_SIZE: 80,
+        GROUND_SIZE: 400, // well past the fence, so the ground fades into the fog instead of ending
+        COIN_SPAWN_HEIGHT: 1,
+        GOLD_COIN_SPAWN_HEIGHT: 6,
+        TREE_EXCLUSION_ZONE: 5
+    },
+
     DESERT: {
         // Theme metadata
-        displayName: 'LEVEL 2',
         biomeName: 'Dusty Desert',
         icon: '🌵',
         mapColor: '#e8c98a',
@@ -147,7 +202,6 @@ const LEVELS = {
 
     SNOW: {
         // Theme metadata
-        displayName: 'LEVEL 3',
         biomeName: 'Snowy Peaks',
         icon: '❄️',
         mapColor: '#e3f0fb',
@@ -202,7 +256,6 @@ const LEVELS = {
 
     JUNGLE: {
         // Theme metadata
-        displayName: 'LEVEL 4',
         biomeName: 'Jungle Jumble',
         icon: '🌴',
         mapColor: '#2e7d32',
@@ -258,7 +311,6 @@ const LEVELS = {
 
     VOLCANO: {
         // Theme metadata
-        displayName: 'LEVEL 5',
         biomeName: 'Volcano Valley',
         icon: '🌋',
         mapColor: '#8a2a0a',
@@ -339,6 +391,10 @@ const LEVELS = {
         RANDOM_OFFSET: 1.5
     }
 };
+
+// "LEVEL 1", "LEVEL 2"... come from each world's place in LEVEL_ORDER, so they stay right when a
+// world is added in between
+LEVEL_ORDER.forEach((name, i) => { LEVELS[name].displayName = `LEVEL ${i + 1}`; });
 
 // Helper functions for level generation
 const LevelUtils = {

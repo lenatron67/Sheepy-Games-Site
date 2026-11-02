@@ -200,6 +200,60 @@ const TextureGenerator = {
         texture.repeat.set(25, 25);
 
         return texture;
+    },
+
+    // Seashell Shore: pale golden sand, finer and warmer than the desert's, with damp patches and
+    // tiny flecks of broken shell (far too small to be taken for the shells you collect)
+    generateBeachTexture() {
+        const size = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#f2e0b0';
+        ctx.fillRect(0, 0, size, size);
+
+        // Soft damp patches, drawn wrapped round the edges so the texture tiles without seams
+        for (let i = 0; i < 18; i++) {
+            const x = Math.random() * size, y = Math.random() * size, r = 20 + Math.random() * 50;
+            const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+            g.addColorStop(0, 'rgba(205, 175, 125, 0.25)');
+            g.addColorStop(1, 'rgba(205, 175, 125, 0)');
+            ctx.fillStyle = g;
+            for (const dx of [-size, 0, size]) {
+                for (const dy of [-size, 0, size]) {
+                    ctx.save();
+                    ctx.translate(dx, dy);
+                    ctx.beginPath();
+                    ctx.arc(x, y, r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+        }
+
+        // Fine grain: light and dark specks
+        for (let i = 0; i < 9000; i++) {
+            ctx.fillStyle = Math.random() < 0.5
+                ? `rgba(255, 250, 235, ${0.3 + Math.random() * 0.4})`
+                : `rgba(190, 160, 110, ${0.2 + Math.random() * 0.3})`;
+            ctx.fillRect(Math.random() * size, Math.random() * size, 1.5, 1.5);
+        }
+
+        // Flecks of broken shell
+        for (let i = 0; i < 220; i++) {
+            ctx.fillStyle = Math.random() < 0.5 ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 190, 175, 0.8)';
+            ctx.beginPath();
+            ctx.ellipse(Math.random() * size, Math.random() * size, 1 + Math.random() * 1.5, 0.8 + Math.random(), Math.random() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(25, 25);
+        return texture;
     }
 };
 
@@ -294,6 +348,75 @@ const _Geo = {
     palmFrond:     new THREE.ConeGeometry(1.2, 2.2, 6),
     pineappleBody: new THREE.SphereGeometry(0.65, 10, 10),
     pineappleLeaf: new THREE.ConeGeometry(0.1, 0.55, 4),
+    // Seashell Shore
+    // Scallop shell: a wedge of a thick disc (a fan) standing up, hinge at the bottom. Every other
+    // rim point is pushed out a little and the rim thickened, which makes the ridges and the
+    // scalloped edge.
+    seashell: (() => {
+        const SEGMENTS = 14, START = Math.PI - 1.25, LENGTH = 2.5;
+        const geo = new THREE.CylinderGeometry(0.85, 0.85, 0.14, SEGMENTS, 1, false, START, LENGTH);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i), z = pos.getZ(i);
+            if (Math.hypot(x, z) < 0.8) continue; // the hinge point in the middle of each face
+            let a = Math.atan2(x, z) - START;
+            if (a < -1e-6) a += Math.PI * 2;
+            if (Math.round(a / (LENGTH / SEGMENTS)) % 2 === 1) {
+                pos.setX(i, x * 1.07);
+                pos.setZ(i, z * 1.07);
+                pos.setY(i, pos.getY(i) * 1.5);
+            }
+        }
+        geo.rotateX(Math.PI / 2);   // stand it up, facing the camera, fan pointing up
+        geo.translate(0, -0.42, 0); // spin round its middle
+        geo.computeVertexNormals();
+        return geo;
+    })(),
+    seashellHinge: new THREE.BoxGeometry(0.42, 0.16, 0.18),
+    // Five-pointed starfish, puffy from its bevel, standing up like the coins
+    starfish: (() => {
+        const shape = new THREE.Shape();
+        for (let i = 0; i < 10; i++) {
+            const a = (i / 10) * Math.PI * 2 + Math.PI / 2; // first point straight up
+            const r = i % 2 === 0 ? 0.85 : 0.36;
+            if (i === 0) shape.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+            else shape.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        shape.closePath();
+        const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.12, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.07, bevelSegments: 1 });
+        geo.translate(0, 0, -0.06);
+        return geo;
+    })(),
+    // Beach ball: six coloured panels round it, white at the poles. Each triangle takes the colour
+    // of the panel its middle is in; the panel edges fall on the sphere's own segment edges.
+    beachBall: (() => {
+        const geo = new THREE.SphereGeometry(0.55, 18, 12).toNonIndexed();
+        const pos = geo.attributes.position;
+        const panels = [0xe53935, 0xffffff, 0x1e88e5, 0xffffff, 0xfdd835, 0xffffff].map(c => new THREE.Color(c));
+        const white = new THREE.Color(0xffffff);
+        const colors = [];
+        for (let i = 0; i < pos.count; i += 3) {
+            const cx = (pos.getX(i) + pos.getX(i + 1) + pos.getX(i + 2)) / 3;
+            const cy = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3;
+            const cz = (pos.getZ(i) + pos.getZ(i + 1) + pos.getZ(i + 2)) / 3;
+            const a = Math.atan2(cz, cx) + Math.PI; // 0 to 2 pi round the ball
+            const c = Math.abs(cy) > 0.47 ? white : panels[Math.floor(a / (Math.PI * 2) * 6) % 6];
+            for (let k = 0; k < 3; k++) colors.push(c.r, c.g, c.b);
+        }
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        return geo;
+    })(),
+    gullBody:      new THREE.SphereGeometry(1, 12, 10),
+    gullHead:      new THREE.SphereGeometry(0.32, 10, 8),
+    gullBeak:      new THREE.ConeGeometry(0.09, 0.42, 6),
+    gullEye:       new THREE.SphereGeometry(0.06, 6, 6),
+    gullNeck:      new THREE.CylinderGeometry(0.33, 0.4, 0.16, 10),
+    gullNeckTip:   new THREE.ConeGeometry(0.14, 0.3, 4),
+    gullWing:      new THREE.BoxGeometry(0.08, 0.36, 1.0),
+    gullWingTip:   new THREE.BoxGeometry(0.09, 0.3, 0.32),
+    gullTail:      new THREE.BoxGeometry(0.35, 0.08, 0.4),
+    gullLeg:       new THREE.CylinderGeometry(0.04, 0.04, 0.5, 5),
+    gullFoot:      new THREE.BoxGeometry(0.2, 0.04, 0.26),
 };
 
 // Shared materials — created once at startup, reused by every mesh instance
@@ -365,6 +488,15 @@ const _Mat = {
     tigerEye:      new THREE.MeshBasicMaterial({ color: 0xffffff }),
     tigerPupil:    new THREE.MeshBasicMaterial({ color: 0x111111 }),
     tigerStripe:   new THREE.MeshBasicMaterial({ color: 0x1a0a00 }),
+    // Seashell Shore
+    seashell:      new THREE.MeshStandardMaterial({ color: 0xffa98f, roughness: 0.45, metalness: 0.05, emissive: 0x3a1a12, flatShading: true, side: THREE.DoubleSide }),
+    starfish:      new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.3, roughness: 0.3, emissive: 0x443300 }),
+    beachBall:     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.05 }),
+    gullWhite:     new THREE.MeshStandardMaterial({ color: 0xf7f7f2, roughness: 0.8 }),
+    gullGrey:      new THREE.MeshStandardMaterial({ color: 0x9aa5b1, roughness: 0.8 }),
+    gullDark:      new THREE.MeshStandardMaterial({ color: 0x2b2f36, roughness: 0.8 }),
+    gullEye:       new THREE.MeshBasicMaterial({ color: 0x111111 }),
+    gullLeg:       new THREE.MeshStandardMaterial({ color: 0xf08a24, roughness: 0.6 }),
 };
 
 // 3D Model creation functions
@@ -1114,6 +1246,147 @@ const ModelCreator = {
             group.add(rail);
         });
 
+        return group;
+    },
+
+    // ---------- Seashell Shore (beach) ----------
+
+    createSeashell() {
+        const group = new THREE.Group();
+        const shell = new THREE.Mesh(_Geo.seashell, _Mat.seashell);
+        shell.castShadow = true;
+        group.add(shell);
+        const hinge = new THREE.Mesh(_Geo.seashellHinge, _Mat.seashell);
+        hinge.position.y = -0.42;
+        group.add(hinge);
+        return group;
+    },
+
+    createStarfish() {
+        const star = new THREE.Mesh(_Geo.starfish, _Mat.starfish);
+        star.castShadow = true;
+        return star;
+    },
+
+    createBeachBall() {
+        const ball = new THREE.Mesh(_Geo.beachBall, _Mat.beachBall);
+        ball.castShadow = true;
+        return ball;
+    },
+
+    // Beach obstacle: a striped umbrella with a towel, or a sandcastle with a flag and bucket. Each
+    // is one merged, vertex-coloured mesh (one draw call), and stands within the usual 1.5
+    // collision radius of the obstacles. Uses mergePieces from scenery.js (loaded by the time
+    // levels are built).
+    createBeachObstacle() {
+        const variants = sceneryCached('beachObstacles', () => {
+            const B = new THREE.BoxGeometry(1, 1, 1);
+            const umbrella = ([a, b]) => {
+                const pieces = [
+                    { geo: new THREE.CylinderGeometry(0.07, 0.07, 3.1, 6), color: '#f2f2f2', pos: [0, 1.55, 0] },
+                    { geo: new THREE.SphereGeometry(0.12, 6, 4), color: a, pos: [0, 3.85, 0] }
+                ];
+                for (let k = 0; k < 8; k++) { // canopy: eight wedges in two colours
+                    pieces.push({ geo: new THREE.ConeGeometry(2.0, 0.8, 2, 1, false, k * Math.PI / 4, Math.PI / 4), color: k % 2 ? b : a, pos: [0, 3.4, 0] });
+                }
+                for (let k = 0; k < 4; k++) { // striped towel on the sand beside the pole
+                    pieces.push({ geo: B, color: k % 2 ? '#ffffff' : a, pos: [0.85, 0.025, -0.45 + k * 0.5], scale: [1.2, 0.04, 0.5] });
+                }
+                return mergePieces(pieces);
+            };
+            const sandcastle = (flag, pointy) => {
+                const SAND = '#e3c48a', DARK = '#d4b276';
+                const pieces = [
+                    { geo: new THREE.CylinderGeometry(1.35, 1.5, 0.35, 8), color: DARK, pos: [0, 0.17, 0] },
+                    { geo: B, color: SAND, pos: [0, 0.85, 0], scale: [1.5, 1.0, 1.5] },
+                    { geo: new THREE.CylinderGeometry(0.42, 0.48, 0.9, 7), color: SAND, pos: [0, 1.8, 0] },
+                    { geo: B, color: '#a8875a', pos: [0, 0.62, 0.76], scale: [0.4, 0.55, 0.05] },   // door, facing the camera
+                    { geo: new THREE.CylinderGeometry(0.025, 0.025, 0.9, 4), color: '#8a6a42', pos: [0, 2.7, 0] },
+                    { geo: B, color: flag, pos: [0.25, 2.98, 0], scale: [0.5, 0.3, 0.03] },
+                    // a bucket left beside it
+                    { geo: new THREE.CylinderGeometry(0.22, 0.17, 0.35, 8), color: flag, pos: [1.05, 0.18, 0.55] }
+                ];
+                [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([sx, sz]) => {
+                    pieces.push({ geo: new THREE.CylinderGeometry(0.32, 0.36, 1.5, 7), color: SAND, pos: [sx * 0.75, 0.75, sz * 0.75] });
+                    pieces.push(pointy
+                        ? { geo: new THREE.ConeGeometry(0.38, 0.55, 7), color: DARK, pos: [sx * 0.75, 1.77, sz * 0.75] }
+                        : { geo: new THREE.CylinderGeometry(0.4, 0.34, 0.2, 7), color: DARK, pos: [sx * 0.75, 1.6, sz * 0.75] });
+                });
+                return mergePieces(pieces);
+            };
+            return [
+                umbrella(['#e53935', '#ffffff']), umbrella(['#1e88e5', '#ffffff']), umbrella(['#fdd835', '#ff7043']),
+                sandcastle('#e53935', true), sandcastle('#1e88e5', false)
+            ];
+        });
+        // Three umbrellas to every two sandcastles
+        const mesh = new THREE.Mesh(variants[Math.floor(Math.random() * variants.length)], vertexColourMaterial());
+        mesh.castShadow = true;
+        const group = new THREE.Group();
+        group.add(mesh);
+        return group;
+    },
+
+    // Seagull enemy, facing +z: waddles, then spreads its wings and swoops (see 'swoop' in
+    // main.js). It's all in an inner group (userData.bird), so the swoop can lift the bird
+    // without moving the enemy itself, whose collision stays the same. The neckerchief's colour
+    // shows the AI type, and turns grey when scared.
+    createSeagull(colorHex) {
+        const group = new THREE.Group();
+        const bird = new THREE.Group();
+        bird.position.y = -0.5; // enemies are held 0.5 above the ground: this stands the gull on it
+        group.add(bird);
+
+        const neckMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5 });
+        const beakMat = new THREE.MeshStandardMaterial({ color: 0xffc030, roughness: 0.5 });
+        const add = (geo, mat, x, y, z, parent = bird) => {
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, z);
+            parent.add(mesh);
+            return mesh;
+        };
+
+        const body = add(_Geo.gullBody, _Mat.gullWhite, 0, 0.9, 0);
+        body.scale.set(0.55, 0.5, 0.85);
+        body.castShadow = true;
+        add(_Geo.gullHead, _Mat.gullWhite, 0, 1.45, 0.6).castShadow = true;
+        const beak = add(_Geo.gullBeak, beakMat, 0, 1.38, 1.0);
+        beak.rotation.x = Math.PI / 2;
+        add(_Geo.gullEye, _Mat.gullEye, -0.2, 1.53, 0.82);
+        add(_Geo.gullEye, _Mat.gullEye, 0.2, 1.53, 0.82);
+
+        const neck = add(_Geo.gullNeck, neckMat, 0, 1.18, 0.45);
+        neck.rotation.x = -0.3;
+        const tip = add(_Geo.gullNeckTip, neckMat, 0, 1.0, 0.78);
+        tip.rotation.x = Math.PI; // the neckerchief's point, hanging down at the front
+
+        const tail = add(_Geo.gullTail, _Mat.gullGrey, 0, 0.98, -0.85);
+        tail.rotation.x = -0.3;
+
+        // Wings hang along the sides from a hinge at the shoulder; the swoop swings them out
+        const wings = [-1, 1].map(s => {
+            const pivot = new THREE.Group();
+            pivot.position.set(s * 0.48, 1.08, 0.05);
+            bird.add(pivot);
+            add(_Geo.gullWing, _Mat.gullGrey, s * 0.02, -0.16, -0.05, pivot).castShadow = true;
+            add(_Geo.gullWingTip, _Mat.gullDark, s * 0.02, -0.18, -0.6, pivot);
+            return pivot;
+        });
+
+        [-0.15, 0.15].forEach(x => {
+            add(_Geo.gullLeg, _Mat.gullLeg, x, 0.3, 0.05);
+            add(_Geo.gullFoot, _Mat.gullLeg, x, 0.04, 0.12);
+        });
+
+        group.userData = {
+            originalColor: colorHex,
+            isScared: false,
+            bodyMesh: neck,
+            tongueMesh: beak,
+            tongueMeshNormalColor: 0xffc030,
+            bird,
+            wings
+        };
         return group;
     }
 };

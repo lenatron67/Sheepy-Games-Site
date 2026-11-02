@@ -6,7 +6,8 @@
 //              stopping at an edge. Only on the north, east and west sides: the camera always
 //              faces north, so the south side is never on screen (and anything there could come
 //              between the camera and Sheepy when Sheepy is by the south fence).
-//   animals  - a few creatures wandering, hopping or flying just outside the fence
+//   animals  - a few creatures wandering, hopping or flying just outside the fence, and other
+//              things that move out there (the beach's sea and boats, the volcano's geysers)
 //   detail   - small walk-through things (flowers, pebbles, mushrooms...) between the middle
 //              80x80, where collectables spawn, and the fence. Kept low, and in shapes and colours
 //              that can't be taken for that world's collectables, bonus items or enemies.
@@ -45,6 +46,7 @@ const Outskirts = (() => {
             bloom: new THREE.CylinderGeometry(1, 0.35, 1, 6),   // flower head
             crater: new THREE.CylinderGeometry(0.3, 1, 1, 8),   // cone with its top cut off
             prism: new THREE.CylinderGeometry(1, 1, 1, 3),      // barn roof
+            octa: new THREE.OctahedronGeometry(1, 0),           // kite
             dome: new THREE.SphereGeometry(1, 10, 4, 0, TAU, 0, Math.PI / 2), // flat base at y = 0
             // Low rounded hill: a slice off the top of a sphere, so its edge meets the ground at a
             // gentle slope instead of a wall. Base radius 1 at y = 0, height 1.
@@ -540,7 +542,243 @@ const Outskirts = (() => {
         });
     }
 
-    const ANIMAL_KINDS = { walker: walkers, hopper: hoppers, flock: flocks, roller: rollers, geyser: geysers, smoker: smokers };
+    // The sea past the north fence (Seashell Shore): water whose edge washes in and out along a
+    // wavy shore, a line of foam that follows it, and a band of wet sand. Waves roll in towards
+    // the beach. At high tide the water comes to about 3 past the fence, never closer.
+    function seas(spec, fence) {
+        const SHORE = fence + 7; // the water's edge at low tide
+        const W = 440, D = 170, SEG = 110;
+        const waveTex = sceneryCached('seaWaves', () => {
+            const S = 256;
+            const [canvas, ctx] = makeCanvas(S, S);
+            ctx.fillStyle = '#2f9fcf';
+            ctx.fillRect(0, 0, S, S);
+            // Wave crests: wobbly light lines across, each a whole number of wobbles wide (so the
+            // texture tiles), drawn again a tile up and down so none are cut at the edges
+            for (let k = 0; k < 6; k++) {
+                const y0 = (k + Math.random() * 0.5) * S / 6, phase = Math.random() * Math.PI * 2;
+                [[3, 'rgba(190, 235, 250, 0.55)', 0], [7, 'rgba(160, 220, 245, 0.22)', 6]].forEach(([width, colour, behind]) => {
+                    ctx.strokeStyle = colour;
+                    ctx.lineWidth = width;
+                    for (const dy of [-S, 0, S]) {
+                        ctx.beginPath();
+                        for (let x = 0; x <= S; x += 4) {
+                            const y = y0 + behind + dy + Math.sin(x / S * Math.PI * 4 + phase) * 6;
+                            if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                        }
+                        ctx.stroke();
+                    }
+                });
+            }
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'; // glints
+            for (let i = 0; i < 120; i++) ctx.fillRect(Math.random() * S, Math.random() * S, 2, 1);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(W / 18, D / 18);
+            return tex;
+        });
+        // Foam: white and bubbly, strongest in the middle of the strip (the water's edge)
+        const foamTex = sceneryCached('seaFoam', () => {
+            const U = 256, V = 64;
+            const [canvas, ctx] = makeCanvas(U, V);
+            const img = ctx.createImageData(U, V);
+            for (let y = 0; y < V; y++) {
+                const v = 1 - y / (V - 1); // 0 on the sea side, 1 on the beach side
+                const profile = v < 0.5 ? Math.pow(v / 0.5, 1.5) : Math.pow(1 - (v - 0.5) / 0.5, 2);
+                for (let x = 0; x < U; x++) {
+                    const i = (y * U + x) * 4;
+                    img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+                    img.data[i + 3] = 255 * profile * (0.5 + 0.5 * Math.random());
+                }
+            }
+            ctx.putImageData(img, 0, 0);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            return tex;
+        });
+        // Wet sand: darker, fading out up the beach
+        const wetTex = sceneryCached('wetSand', () => {
+            const [canvas, ctx] = makeCanvas(4, 64);
+            const g = ctx.createLinearGradient(0, 0, 0, 64);
+            g.addColorStop(0, 'rgba(190, 160, 110, 0.85)');  // top = the sea side
+            g.addColorStop(1, 'rgba(190, 160, 110, 0)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, 4, 64);
+            return new THREE.CanvasTexture(canvas);
+        });
+
+        const geo = new THREE.PlaneGeometry(W, D, SEG, 1);
+        geo.rotateX(-Math.PI / 2);
+        geo.translate(0, 0.06, -(SHORE + D / 2));
+        const pos = geo.attributes.position;
+        const edge = []; // the points along the shore (the south row), west to east
+        for (let i = 0; i < pos.count; i++) if (pos.getZ(i) > -(SHORE + 1)) edge.push(i);
+        edge.sort((a, b) => pos.getX(a) - pos.getX(b));
+        const waterMat = new THREE.MeshPhongMaterial({ map: waveTex, shininess: 80, specular: 0x9fd8f0 });
+        const water = new THREE.Mesh(geo, waterMat);
+
+        // Foam strip along the edge: two points per edge point, sea side then beach side
+        const n = edge.length;
+        const foamGeo = new THREE.BufferGeometry();
+        const uvs = [], index = [];
+        for (let k = 0; k < n; k++) {
+            const u = pos.getX(edge[k]) / 8;
+            uvs.push(u, 0, u, 1);
+            if (k > 0) {
+                const a = (k - 1) * 2;
+                index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); // wound to face up
+            }
+        }
+        foamGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(n * 6), 3));
+        foamGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        foamGeo.setIndex(index);
+        foamGeo.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(n * 6).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3)); // all facing up
+        const foamMat = makeDecalMaterial(foamTex, 'lit');
+        const foam = new THREE.Mesh(foamGeo, foamMat);
+        foam.frustumCulled = false; // its points move every frame; the whole sea is culled below instead
+
+        const wetGeo = new THREE.PlaneGeometry(W, SHORE + 3 - (fence + 1.5));
+        wetGeo.rotateX(-Math.PI / 2);
+        wetGeo.translate(0, 0.03, -(fence + 1.5 + (SHORE + 3 - (fence + 1.5)) / 2));
+        const wetMat = makeDecalMaterial(wetTex, 'lit');
+        const wet = new THREE.Mesh(wetGeo, wetMat);
+        wet.receiveShadow = true;
+
+        const group = new THREE.Group();
+        group.add(water, foam, wet);
+        const fpos = foamGeo.attributes.position;
+        const box = new THREE.Box3(new THREE.Vector3(-W / 2, -1, -(SHORE + D)), new THREE.Vector3(W / 2, 2, -(fence + 1)));
+        group.userData.update = (dt, t, camera) => {
+            group.visible = viewOf(camera, t).intersectsBox(box);
+            if (!group.visible) return;
+            const tide = Math.sin(t * 0.45) * 1.4;
+            for (let k = 0; k < n; k++) {
+                const i = edge[k], x = pos.getX(i);
+                const z = -SHORE + 1.5 + tide + Math.sin(x * 0.07 + t * 0.6) * 0.8 + Math.sin(x * 0.21 - t * 0.9) * 0.35;
+                pos.setZ(i, z);
+                fpos.setXYZ(2 * k, x, 0.09, z - 1.4);
+                fpos.setXYZ(2 * k + 1, x, 0.09, z + 0.9);
+            }
+            pos.needsUpdate = true;
+            fpos.needsUpdate = true;
+            waveTex.offset.y = (t * 0.04) % 1;       // waves rolling in
+            foamMat.opacity = 0.8 + 0.15 * Math.sin(t * 0.45);
+        };
+        group.userData.disposables = [geo, waterMat, foamGeo, foamMat, wetGeo, wetMat];
+        return [group];
+    }
+
+    // Sailing boats out at sea, drifting along and rocking on the waves. One that sails out of
+    // sight comes back in on the far side, also out of sight.
+    function sailboats(spec, fence) {
+        return Array.from({ length: spec.count }, () => {
+            const colour = pick(['#e53935', '#1e88e5', '#fdd835', '#43a047']);
+            const boat = new THREE.Mesh(sceneryCached('sailboat' + colour, () => mergeParts(sailboat(colour))), vertexColourMaterial());
+            boat.rotation.order = 'YXZ';
+            boat.scale.setScalar(1.3);
+            const z = -(fence + rand(16, 34)), speed = rand(0.8, 1.6) * (Math.random() < 0.5 ? 1 : -1), phase = rand(0, TAU);
+            let x = rand(-100, 100);
+            boat.userData.update = (dt, t, camera) => {
+                x += speed * dt;
+                if (x > camera.position.x + 120) x -= 240;
+                if (x < camera.position.x - 120) x += 240;
+                boat.position.set(x, 0.05 + Math.sin(t * 1.3 + phase) * 0.12, z);
+                boat.rotation.set(Math.sin(t * 0.9 + phase) * 0.05, speed > 0 ? Math.PI / 2 : -Math.PI / 2, Math.sin(t * 1.1 + phase) * 0.08);
+            };
+            return boat;
+        });
+    }
+
+    // Dolphins out at sea, leaping out of the water every few seconds, with a splash going in
+    // and coming out
+    function dolphins(spec, fence) {
+        const geo = animalGeo(spec).body;
+        const splashGeo = sceneryCached('splashRing', () => new THREE.RingGeometry(0.5, 1.0, 18).rotateX(-Math.PI / 2));
+        return Array.from({ length: spec.count }, () => {
+            const group = new THREE.Group();
+            const body = animalMesh(geo);
+            body.rotation.order = 'YXZ';
+            body.visible = false;
+            group.add(body);
+            const splashMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false });
+            const splash = new THREE.Mesh(splashGeo, splashMat);
+            group.add(splash);
+            const z = -(fence + rand(13, 26));
+            let x = rand(-60, 60), dir = Math.random() < 0.5 ? 1 : -1, wait = rand(0.5, 5), leap = -1, from = 0, splashAge = 9;
+            const makeSplash = () => { splash.position.set(x, 0.1, z); splashAge = 0; };
+            group.userData.update = dt => {
+                splashAge += dt;
+                splash.scale.setScalar(1 + splashAge * 2.5);
+                splashMat.opacity = Math.max(0, 0.8 - splashAge * 1.2);
+                splash.visible = splashMat.opacity > 0;
+                if (leap < 0) {
+                    wait -= dt;
+                    if (wait <= 0) { leap = 0; from = x; body.visible = true; makeSplash(); }
+                    return;
+                }
+                leap = Math.min(1, leap + dt / 1.3);
+                x = from + dir * 8 * leap;
+                body.position.set(x, -0.7 + Math.sin(Math.PI * leap) * 3.4, z);
+                // Nose follows the arc: up coming out, down going in
+                body.rotation.set(-Math.atan2(3.4 * Math.PI * Math.cos(Math.PI * leap), 8), dir > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
+                if (leap >= 1) {
+                    leap = -1;
+                    wait = rand(2.5, 6);
+                    body.visible = false;
+                    makeSplash();
+                    if (Math.abs(x) > 70) dir = x > 0 ? -1 : 1; // turn back before swimming off
+                    else if (Math.random() < 0.3) dir = -dir;
+                }
+            };
+            group.userData.disposables = [splashMat];
+            return group;
+        });
+    }
+
+    // Buoys bobbing just off the beach
+    function buoys(spec, fence) {
+        const geo = animalGeo(spec).body;
+        return Array.from({ length: spec.count }, () => {
+            const mesh = new THREE.Mesh(geo, vertexColourMaterial());
+            const x = rand(-80, 80), z = -(fence + rand(10, 15)), phase = rand(0, TAU);
+            mesh.userData.update = (dt, t) => {
+                mesh.position.set(x, -0.2 + Math.sin(t * 1.6 + phase) * 0.15, z);
+                mesh.rotation.set(Math.sin(t * 1.2 + phase) * 0.12, 0, Math.cos(t * 1.4 + phase) * 0.12);
+            };
+            return mesh;
+        });
+    }
+
+    // Kites flying over the beach outside the east and west fences, their strings tied to the sand
+    function kites(spec, fence, kept) {
+        const stringMat = sceneryCached('kiteString', () => new THREE.LineBasicMaterial({ color: 0x555555 }));
+        return spec.sides.map(side => {
+            const colour = pick(['#e53935', '#1e88e5', '#fdd835', '#8e44ad', '#ff7043']);
+            const kiteMesh = new THREE.Mesh(sceneryCached('kite' + colour, () => mergeParts(kite(colour))), vertexColourMaterial());
+            const anchor = homeSpot(side, fence, 4, 10, kept, 3);
+            kept.push(circle(anchor.x, anchor.z, 2));
+            const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+            const line = new THREE.Line(lineGeo, stringMat);
+            const group = new THREE.Group();
+            group.add(kiteMesh, line);
+            const phase = rand(0, TAU), lp = lineGeo.attributes.position;
+            group.userData.update = (dt, t) => {
+                kiteMesh.position.set(anchor.x + Math.sin(t * 0.6 + phase) * 2.2, 10.5 + Math.sin(t * 1.3 + phase) * 0.9, anchor.z + 4 + Math.cos(t * 0.45 + phase) * 1.5);
+                kiteMesh.rotation.set(-0.35, Math.sin(t * 0.5 + phase) * 0.3, Math.sin(t * 1.7 + phase) * 0.25);
+                lp.setXYZ(0, anchor.x, 0.3, anchor.z);
+                lp.setXYZ(1, kiteMesh.position.x, kiteMesh.position.y - 1.2, kiteMesh.position.z);
+                lp.needsUpdate = true;
+                lineGeo.computeBoundingSphere(); // its ends move, so three.js can still tell when it's out of view
+            };
+            group.userData.disposables = [lineGeo];
+            return group;
+        });
+    }
+
+    const ANIMAL_KINDS = {
+        walker: walkers, hopper: hoppers, flock: flocks, roller: rollers, geyser: geysers, smoker: smokers,
+        sea: seas, sailboat: sailboats, dolphin: dolphins, buoy: buoys, kite: kites
+    };
 
     // ---------- Shared props ----------
 
@@ -599,7 +837,7 @@ const Outskirts = (() => {
     // Low rolling hill, in a colour close to the ground's
     const hill = (colour, w, h, d) => () => [part('cap', vary(colour, 0.025), [0, 0, 0], [rand(...w), rand(...h), rand(...d)])];
     // Hills sit far enough out that their near edge stays 14 or more past the fence
-    const hillLayer = (colour, height = [1.5, 3.5]) => ({ near: 30, far: 54, per100: 7, prop: hill(colour, [10, 16], height, [8, 13]) });
+    const hillLayer = (colour, height = [1.5, 3.5], sides) => ({ near: 30, far: 54, per100: 7, sides, prop: hill(colour, [10, 16], height, [8, 13]) });
 
     // ---------- Sunny Meadow ----------
 
@@ -994,6 +1232,91 @@ const Outskirts = (() => {
         ])
     });
 
+    // ---------- Seashell Shore ----------
+    // No shells, starfish or balls out here: those are the beach's collectables and bonus items
+
+    const SHORE_ROCK = ['#8d8a84', '#7a7771', '#9a968f'];
+    const duneGrass = (height = 0.8) => tuft(['#b9b77a', '#a8a868', '#c8c48a'], randInt(6, 9), height, 0.4);
+    const driftwood = () => [
+        part('cyl', vary('#a89a88', 0.05), [0, 0.12, 0], [0.12, rand(1.4, 2.4), 0.12], [0, 0, Math.PI / 2]),
+        part('cyl', '#9a8c7a', [0.4, 0.2, 0.25], [0.07, 0.7, 0.07], [0.9, 0.6, 0])
+    ];
+    // Seaweed washed up on the sand: dark strands lying flat
+    const seaweed = () => cluster(randInt(4, 6), 0.25, (x, z) => [
+        part('box', vary(pick(['#4f5f26', '#5a6b2e', '#45532a']), 0.04), [x, 0.03, z], [0.12, 0.04, rand(0.5, 0.9)], [0, rand(0, TAU), 0])
+    ]);
+    const towel = () => {
+        const colour = pick(['#e53935', '#1e88e5', '#fdd835', '#43a047', '#ff7043']);
+        const parts = [];
+        for (let k = 0; k < 5; k++) parts.push(part('box', k % 2 ? '#ffffff' : colour, [0, 0.025, -0.9 + k * 0.45], [1.2, 0.04, 0.45]));
+        return parts;
+    };
+    // Striped beach hut, door facing the camera
+    const beachHut = () => {
+        const parts = [
+            part('box', vary(pick(['#4fa3e0', '#e85a5a', '#f2c94c', '#6fcf97', '#f28cc0']), 0.03), [0, 1.3, 0], [2.4, 2.6, 2.4]),
+            part('prism', '#f4f1ea', [0, 2.93, 0], [1.55, 2.7, 0.67], [-Math.PI / 2, 0, 0]),
+            part('box', '#f4f1ea', [0, 0.85, 1.23], [0.95, 1.7, 0.05]),
+            part('box', '#7a5532', [0, 0.1, 1.55], [1.2, 0.2, 0.6])
+        ];
+        for (let k = 0; k < 4; k++) parts.push(part('box', '#ffffff', [-1.05 + k * 0.7, 1.3, 1.215], [0.22, 2.6, 0.04]));
+        return parts;
+    };
+
+    // Sailing boat, facing +z: white hull with a coloured stripe and jib
+    const sailboat = colour => [
+        part('box', '#f4f4f0', [0, 0.3, 0], [1.2, 0.6, 3.0]),
+        part('spike', '#f4f4f0', [0, 0.3, 1.85], [0.6, 0.8, 0.3], [Math.PI / 2, 0, 0]),
+        part('box', colour, [0, 0.55, 0], [1.24, 0.14, 3.04]),
+        part('cyl', '#8a6a42', [0, 2.6, -0.2], [0.06, 4.4, 0.06]),
+        part('spike', '#ffffff', [0, 2.5, -0.85], [0.04, 3.6, 1.25]), // a cone squashed flat is a triangular sail
+        part('spike', colour, [0, 1.9, 0.75], [0.04, 2.5, 0.75])
+    ];
+
+    // Dolphin, facing +z, 4 long
+    const dolphin = () => ({ body: [
+        part('ball', '#6f8fa8', [0, 0, 0], [0.55, 0.55, 1.6]),
+        part('ball', '#d8e4ec', [0, -0.18, 0.1], [0.45, 0.35, 1.3]),
+        part('cone', '#6f8fa8', [0, -0.05, 1.75], [0.2, 0.6, 0.2], [Math.PI / 2, 0, 0]),
+        part('spike', '#5f7f98', [0, 0.62, -0.15], [0.08, 0.6, 0.4], [-0.5, 0, 0]),
+        part('cone', '#6f8fa8', [0, 0, -1.55], [0.3, 0.9, 0.3], [-Math.PI / 2, 0, 0]),
+        part('box', '#5f7f98', [0, 0, -2.0], [1.3, 0.06, 0.45]),
+        part('box', '#5f7f98', [-0.5, -0.3, 0.5], [0.5, 0.05, 0.25], [0, 0, 0.5]),
+        part('box', '#5f7f98', [0.5, -0.3, 0.5], [0.5, 0.05, 0.25], [0, 0, -0.5]),
+        part('box', '#1a1a1a', [-0.38, 0.12, 1.05], [0.05, 0.07, 0.07]),
+        part('box', '#1a1a1a', [0.38, 0.12, 1.05], [0.05, 0.07, 0.07])
+    ]});
+
+    const buoy = () => ({ body: [
+        part('cyl', '#e53935', [0, 0.5, 0], [0.45, 1.0, 0.45]),
+        part('cyl', '#ffffff', [0, 0.85, 0], [0.47, 0.25, 0.47]),
+        part('cone', '#e53935', [0, 1.35, 0], [0.4, 0.6, 0.4]),
+        part('pebble', '#ffe066', [0, 1.75, 0], 0.13)
+    ]});
+
+    // Seal lying on the sand, facing +z; it galumphs about as a hopper with tiny hops
+    const seal = () => ({ body: [
+        part('ball', '#8a8078', [0, 0.4, -0.1], [0.5, 0.4, 0.95]),
+        part('ball', '#8a8078', [0, 0.72, 0.68], 0.32),
+        part('ball', '#a8a096', [0, 0.66, 0.96], [0.16, 0.12, 0.14]),
+        part('pebble', '#1a1a1a', [0, 0.72, 1.08], 0.05),
+        part('box', '#1a1a1a', [-0.15, 0.84, 0.9], [0.05, 0.07, 0.05]),
+        part('box', '#1a1a1a', [0.15, 0.84, 0.9], [0.05, 0.07, 0.05]),
+        part('box', '#7a7068', [-0.45, 0.12, 0.35], [0.35, 0.06, 0.25], [0, 0, 0.3]),
+        part('box', '#7a7068', [0.45, 0.12, 0.35], [0.35, 0.06, 0.25], [0, 0, -0.3]),
+        part('box', '#7a7068', [-0.15, 0.1, -1.0], [0.3, 0.05, 0.35], [0, 0.5, 0]),
+        part('box', '#7a7068', [0.15, 0.1, -1.0], [0.3, 0.05, 0.35], [0, -0.5, 0])
+    ]});
+
+    // Diamond kite with a bow tail, facing +z
+    const kite = colour => [
+        part('octa', colour, [0, 0, 0], [0.95, 1.35, 0.05]),
+        part('box', '#5a3d24', [0, 0, 0.06], [0.05, 2.7, 0.05]),
+        part('box', '#5a3d24', [0, 0.3, 0.06], [1.9, 0.05, 0.05]),
+        part('box', '#666666', [0, -2.2, 0], [0.02, 1.8, 0.02]),
+        ...[-1.6, -2.1, -2.6, -3.1].map((y, i) => part('box', i % 2 ? '#ffffff' : colour, [0, y, 0], [0.32, 0.12, 0.04]))
+    ];
+
     // ---------- The sets, named by `outskirts` in levels.js ----------
     // Backdrop distances are past the fence. The camera sees about 30-50 units past the east and
     // west fences, and 25-40 past the north one (fog hides the rest), so that's where things go.
@@ -1018,6 +1341,32 @@ const Outskirts = (() => {
                 { count: 70, prop: meadowTuft },
                 { count: 18, prop: () => mushrooms(['#b8875a', '#c99a6b', '#a8744a']) },
                 { count: 30, prop: () => pebbles(['#9a9a92', '#8c8d86', '#a5a49b']) }
+            ]
+        },
+
+        beach: {
+            // The sea fills the north side, so the backdrop is only on the east and west
+            animals: [
+                { kind: 'sea' },
+                { kind: 'sailboat', count: 4 },
+                { kind: 'dolphin', name: 'dolphin', model: dolphin, count: 3 },
+                { kind: 'buoy', name: 'buoy', model: buoy, count: 5 },
+                { kind: 'hopper', name: 'seal', model: seal, sides: ['E', 'W', 'E'], hop: 0.5, hopHeight: 0.12, hopTime: 0.45, scale: 1.3 },
+                { kind: 'kite', sides: ['E', 'W', 'W'] }
+            ],
+            backdrop: [
+                { count: 5, sides: ['E', 'W'], near: 10, far: 14, prop: beachHut, turn: [-0.2, 0.2], clear: 3.5 },
+                { near: 1.5, far: 4.5, sides: ['N'], per100: 5, prop: () => pick([driftwood, seaweed, () => pebbles(SHORE_ROCK, 0.35)])() },
+                { near: 2, far: 12, sides: ['E', 'W'], per100: 14, prop: () => pick([() => duneGrass(), () => duneGrass(), driftwood, towel, () => rockPile(SHORE_ROCK, 0.7)])() },
+                { near: 13, far: 32, sides: ['E', 'W'], per100: 9, prop: palm, scale: [0.9, 1.3] },
+                { near: 14, far: 34, sides: ['E', 'W'], per100: 12, prop: () => duneGrass(1.1), scale: [1, 1.6] },
+                hillLayer('#efdcae', [1.5, 3.5], ['E', 'W'])
+            ],
+            detail: [
+                { count: 55, prop: () => duneGrass(0.6) },
+                { count: 40, prop: () => pebbles(SHORE_ROCK) },
+                { count: 25, prop: driftwood },
+                { count: 30, prop: seaweed }
             ]
         },
 
