@@ -26,6 +26,8 @@ const ENEMY_SCALING = {
 //                                  middle of the north edge (seen most, as the camera faces north) and of a side
 //                                  edge. Models are in SceneryModels (scenery.js); scale shrinks or grows one.
 //   groundDetail (optional)      - SceneryModels function for walk-through ground decoration (no collision)
+//   outskirts (optional)         - decoration set from outskirts.js: backdrop past the fence, animals outside
+//                                  it, and small walk-through detail between the middle and the fence
 //
 // Enemies: enemyTypes sets how many and which AI each runs; enemySpeed is units/sec before scaling.
 //   enemyBehaviour gives each biome its own movement rhythm at about the same average speed:
@@ -71,6 +73,7 @@ const LEVELS = {
             { model: 'createStoneCircle', x: 54, z: 2 }
         ],
         groundDetail: 'createMeadowPath',
+        outskirts: 'meadow',
         music: {
             melody: 'G3 D4 B3 G4 D4 B3 G3 B3 C4 E4 G4 C5 G4 E4 C4 E4 G3 D4 B3 G4 D4 B3 G3 B3 D4 F#4 A3 D5 A3 F#4 D4 F#4',
             bass: ['G2', 'C3', 'G2', 'D3'], tempo: 0.13, wave: 'triangle', gain: 0.1, drums: 'standard'
@@ -81,7 +84,7 @@ const LEVELS = {
         TREES_COUNT: 60,
         WORLD_SIZE: 160,
         SMALL_WORLD_SIZE: 80,
-        GROUND_SIZE: 200,
+        GROUND_SIZE: 400, // well past the fence, so the ground fades into the fog instead of ending
         COIN_SPAWN_HEIGHT: 1,
         GOLD_COIN_SPAWN_HEIGHT: 6,
         TREE_EXCLUSION_ZONE: 5
@@ -125,6 +128,7 @@ const LEVELS = {
             { model: 'createPyramid', x: -51, z: 2, halfSize: 7.15, scale: 0.65 }
         ],
         groundDetail: 'createSandRipples',
+        outskirts: 'desert',
         music: {
             melody: 'E4 F4 G#4 A4 B4 A4 G#4 F4 E4 - E4 F4 G#4 F4 E4 - B4 C5 B4 A4 G#4 A4 B4 - C5 B4 A4 G#4 F4 G#4 E4 -',
             bass: ['E2', 'E2', 'F2', 'E2'], tempo: 0.15, wave: 'square', gain: 0.05, drums: 'standard'
@@ -135,7 +139,7 @@ const LEVELS = {
         TREES_COUNT: 60,
         WORLD_SIZE: 160,
         SMALL_WORLD_SIZE: 80,
-        GROUND_SIZE: 200,
+        GROUND_SIZE: 400, // well past the fence, so the ground fades into the fog instead of ending
         COIN_SPAWN_HEIGHT: 1,
         GOLD_COIN_SPAWN_HEIGHT: 6,
         TREE_EXCLUSION_ZONE: 5
@@ -179,6 +183,7 @@ const LEVELS = {
             { model: 'createIgloo', x: 49, z: 2, radius: 5.04, scale: 0.7 }
         ],
         groundDetail: 'createIcePatches',
+        outskirts: 'snow',
         music: {
             melody: 'C5 E5 G5 E5 C6 G5 E5 G5 A4 C5 E5 C5 A5 E5 C5 E5 F4 A4 C5 A4 F5 C5 A4 C5 G4 B4 D5 B4 G5 D5 B4 D5',
             bass: ['C3', 'A2', 'F2', 'G2'], tempo: 0.16, wave: 'sine', gain: 0.12, drums: 'soft'
@@ -189,7 +194,7 @@ const LEVELS = {
         TREES_COUNT: 50,
         WORLD_SIZE: 160,
         SMALL_WORLD_SIZE: 80,
-        GROUND_SIZE: 200,
+        GROUND_SIZE: 400, // well past the fence, so the ground fades into the fog instead of ending
         COIN_SPAWN_HEIGHT: 1,
         GOLD_COIN_SPAWN_HEIGHT: 6,
         TREE_EXCLUSION_ZONE: 5
@@ -234,6 +239,7 @@ const LEVELS = {
             { model: 'createStoneHead', x: -48, z: 2, radius: 3.8 }
         ],
         groundDetail: 'createRuinsPath',
+        outskirts: 'jungle',
         music: {
             melody: 'G4 - B4 D5 E5 D5 B4 - A4 - B4 A4 G4 E4 G4 - D5 - E5 G5 E5 D5 B4 - A4 B4 D5 B4 A4 G4 G4 -',
             bass: ['G2', 'E2', 'C3', 'D3'], tempo: 0.12, wave: 'triangle', gain: 0.1, drums: 'tribal'
@@ -244,7 +250,7 @@ const LEVELS = {
         TREES_COUNT: 60,
         WORLD_SIZE: 160,
         SMALL_WORLD_SIZE: 80,
-        GROUND_SIZE: 200,
+        GROUND_SIZE: 400, // well past the fence, so the ground fades into the fog instead of ending
         COIN_SPAWN_HEIGHT: 1,
         GOLD_COIN_SPAWN_HEIGHT: 6,
         TREE_EXCLUSION_ZONE: 5
@@ -288,6 +294,7 @@ const LEVELS = {
             { model: 'createLavaPool', x: 50, z: 2, radius: 5.8 }
         ],
         groundDetail: 'createLavaCracks',
+        outskirts: 'volcano',
         music: {
             melody: 'A4 A4 C5 A4 E5 A4 D5 C5 A4 A4 C5 A4 G4 E4 G4 B4 A4 A4 C5 A4 E5 A4 F5 E5 D5 C5 B4 C5 A4 E4 A4 -',
             bass: ['A2', 'A2', 'F2', 'E2'], tempo: 0.11, wave: 'square', gain: 0.05, drums: 'driving'
@@ -298,7 +305,7 @@ const LEVELS = {
         TREES_COUNT: 55,
         WORLD_SIZE: 160,
         SMALL_WORLD_SIZE: 80,
-        GROUND_SIZE: 200,
+        GROUND_SIZE: 400, // well past the fence, so the ground fades into the fog instead of ending
         COIN_SPAWN_HEIGHT: 1,
         GOLD_COIN_SPAWN_HEIGHT: 6,
         TREE_EXCLUSION_ZONE: 5

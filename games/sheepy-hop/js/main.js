@@ -150,6 +150,7 @@ class GameEngine {
         const groundGeometry = new THREE.PlaneGeometry(level.GROUND_SIZE, level.GROUND_SIZE);
 
         const texture = TextureGenerator[level.groundType]();
+        texture.repeat.set(level.GROUND_SIZE / 8, level.GROUND_SIZE / 8); // one tile every 8 units
 
         const groundMaterial = new THREE.MeshStandardMaterial({
             map: texture,
@@ -206,6 +207,10 @@ class GameEngine {
         // Create fence perimeter to keep play area bounded
         const fence = ModelCreator.createFencePerimeter(level.WORLD_SIZE);
         this.scene.add(fence);
+
+        // Backdrop and animals past the fence, and walk-through detail in the outer arena (after the
+        // obstacles, so the detail keeps off them without moving any)
+        Outskirts.create(this.scene, level, this.trees);
 
         if (level.hasEnemies) {
             this.snakes = [];

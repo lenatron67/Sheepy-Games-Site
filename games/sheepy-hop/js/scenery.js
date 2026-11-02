@@ -157,16 +157,18 @@ function makeCanvas(width, height) {
 
 // Many simple shapes merged into one mesh, each with its own colour, so a whole landmark costs
 // one draw call. Texture coordinates are kept too, for textured merges.
-// pieces: [{ geo, color, pos: [x,y,z], rot: [x,y,z], scale: [x,y,z] }]
+// pieces: [{ geo, color, pos: [x,y,z], rot: [x,y,z], scale: [x,y,z] }], or { geo, color, matrix }
+// with a ready-made Matrix4 instead of pos/rot/scale
 function mergePieces(pieces) {
     const positions = [], normals = [], colors = [], uvs = [], indices = [];
     const m = new THREE.Matrix4(), nm = new THREE.Matrix3();
     const v = new THREE.Vector3(), q = new THREE.Quaternion(), e = new THREE.Euler(), col = new THREE.Color();
     let offset = 0;
     pieces.forEach(p => {
-        m.compose(new THREE.Vector3(...(p.pos || [0, 0, 0])),
-                  q.setFromEuler(e.set(...(p.rot || [0, 0, 0]))),
-                  new THREE.Vector3(...(p.scale || [1, 1, 1])));
+        if (p.matrix) m.copy(p.matrix);
+        else m.compose(new THREE.Vector3(...(p.pos || [0, 0, 0])),
+                       q.setFromEuler(e.set(...(p.rot || [0, 0, 0]))),
+                       new THREE.Vector3(...(p.scale || [1, 1, 1])));
         nm.getNormalMatrix(m);
         col.set(p.color);
         const pos = p.geo.attributes.position, nor = p.geo.attributes.normal, uv = p.geo.attributes.uv;
