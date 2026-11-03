@@ -3,8 +3,18 @@
 class AudioManager {
     constructor() {
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Every sound goes through this master volume, so Mute (in the pause menu) silences them all.
+        // The choice is remembered on this device.
+        this.master = this.audioContext.createGain();
+        this.master.connect(this.audioContext.destination);
+        this.muted = false;
+        try { this.muted = localStorage.getItem('sheepy_hop_muted') === '1'; } catch (e) { /* storage blocked */ }
+        this.master.gain.value = this.muted ? 0 : 1;
+
         this.gameMusicTimer = null;
         this.isGameMusicActive = false;
+        this.isGameMusicPaused = false;
         this.gameBeat = 0;
         this.noiseBuffer = null;
         
@@ -60,6 +70,12 @@ class AudioManager {
         }
     }
     
+    setMuted(muted) {
+        this.muted = muted;
+        this.master.gain.value = muted ? 0 : 1;
+        try { localStorage.setItem('sheepy_hop_muted', muted ? '1' : '0'); } catch (e) { /* storage blocked */ }
+    }
+
     // Play baa sound
     playBaa(baseFreq = 220) {
         this.init();
@@ -96,7 +112,7 @@ class AudioManager {
         // Connect nodes
         osc.connect(filter);
         filter.connect(gain);
-        gain.connect(this.audioContext.destination);
+        gain.connect(this.master);
         
         // Start/stop
         osc.start(t);
@@ -116,7 +132,7 @@ class AudioManager {
         const gain = this.audioContext.createGain();
         
         osc.connect(gain);
-        gain.connect(this.audioContext.destination);
+        gain.connect(this.master);
         
         if (type === 'gold') {
             osc.type = 'sine';
@@ -186,13 +202,14 @@ class AudioManager {
         if (this.isGameMusicActive) return;
 
         this.isGameMusicActive = true;
+        this.isGameMusicPaused = false;
         this.gameBeat = 0;
         const song = this.compileTrack(track || { melody: this.GAME_MELODY, bass: [98.00, 130.81, 98.00, 146.83] });
         this.activeTrack = song;
         const tempo = song.tempo; // seconds per beat
 
         const playBeat = () => {
-            if (!this.isGameMusicActive) return;
+            if (!this.isGameMusicActive || this.isGameMusicPaused) return;
 
             const t = this.audioContext.currentTime;
             const freq = song.melody[this.gameBeat % song.melody.length];
@@ -209,7 +226,7 @@ class AudioManager {
                 gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
 
                 osc.connect(gain);
-                gain.connect(this.audioContext.destination);
+                gain.connect(this.master);
                 osc.start(t);
                 osc.stop(t + 0.15);
             }
@@ -234,7 +251,7 @@ class AudioManager {
                 
                 osc.connect(filter);
                 filter.connect(gain);
-                gain.connect(this.audioContext.destination);
+                gain.connect(this.master);
                 osc.start(t);
                 osc.stop(t + 0.2);
             }
@@ -245,8 +262,23 @@ class AudioManager {
             this.gameBeat++;
             this.gameMusicTimer = setTimeout(playBeat, tempo * 1000);
         };
-        
+        this.playBeat = playBeat;
+
         playBeat();
+    }
+
+    // Pause the level's tune where it is (pause menu), and carry on from there
+    pauseGameMusic() {
+        if (!this.isGameMusicActive || this.isGameMusicPaused) return;
+        this.isGameMusicPaused = true;
+        clearTimeout(this.gameMusicTimer);
+    }
+
+    resumeGameMusic() {
+        if (!this.isGameMusicActive || !this.isGameMusicPaused) return;
+        this.isGameMusicPaused = false;
+        this.init();
+        this.playBeat();
     }
     
     // Drum patterns, one step (beat) at a time
@@ -283,7 +315,7 @@ class AudioManager {
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
 
         osc.connect(gain);
-        gain.connect(this.audioContext.destination);
+        gain.connect(this.master);
         osc.start(t);
         osc.stop(t + 0.1);
     }
@@ -302,7 +334,7 @@ class AudioManager {
 
         src.connect(filter);
         filter.connect(gain);
-        gain.connect(this.audioContext.destination);
+        gain.connect(this.master);
         src.start(t);
         src.stop(t + 0.1);
     }
@@ -318,7 +350,7 @@ class AudioManager {
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
 
         osc.connect(gain);
-        gain.connect(this.audioContext.destination);
+        gain.connect(this.master);
         osc.start(t);
         osc.stop(t + 0.15);
     }
@@ -326,6 +358,7 @@ class AudioManager {
     // Stop game music
     stopGameMusic() {
         this.isGameMusicActive = false;
+        this.isGameMusicPaused = false;
         if (this.gameMusicTimer) {
             clearTimeout(this.gameMusicTimer);
         }
@@ -356,7 +389,7 @@ class AudioManager {
                 gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
                 
                 osc.connect(gain);
-                gain.connect(this.audioContext.destination);
+                gain.connect(this.master);
                 osc.start(t);
                 osc.stop(t + 0.2);
             }
@@ -373,7 +406,7 @@ class AudioManager {
                 gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
                 
                 osc.connect(gain);
-                gain.connect(this.audioContext.destination);
+                gain.connect(this.master);
                 osc.start(t);
                 osc.stop(t + 0.3);
             }

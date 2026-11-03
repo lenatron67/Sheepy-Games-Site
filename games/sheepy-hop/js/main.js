@@ -14,6 +14,9 @@ const MAX_DELTA_TIME = 0.1;
 // middle ground: raise to 2 if tablets keep a smooth frame rate.
 const MAX_PIXEL_RATIO = 1.5;
 
+// How long Sheepy flashes and can't be hurt after losing a life (16 flashes of 0.2s, as before)
+const INVINCIBLE_SECONDS = 3.2;
+
 // Frame-rate-independent version of a per-frame lerp factor (e.g. 0.05 = "close 5% of the gap each 60fps frame")
 function frameLerpAlpha(alphaPerFrame, frameScale) {
     return 1 - Math.pow(1 - alphaPerFrame, frameScale);
@@ -45,6 +48,8 @@ class GameEngine {
         this.touchId = null;
         this.uiElements = {};
         this.sparkBudget = 0; // fractional sparks carried between frames (Sheepy-mode trail)
+        this.paused = false;     // pause menu open: the level stands still
+        this.invincibleTime = 0; // seconds of flashing left after losing a life (game time, so pausing doesn't use it up)
 
         this.init();
     }
@@ -298,15 +303,48 @@ class GameEngine {
                 if (this.isWorldMapOpen()) this.playWorld(Progress.furthestUnlocked());
                 else this.showWorldMap();
             }
-            if (gameState.gameState === 'PLAYING' || gameState.gameState === 'BONUS') {
+            // Escape or P pauses and resumes
+            if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+                if (this.paused) this.resumeGame(); else this.pauseGame();
+                return;
+            }
+            if ((gameState.gameState === 'PLAYING' || gameState.gameState === 'BONUS') && !this.paused) {
                 this.keys[e.key] = true;
                 if (e.code === 'Space') this.handleAction();
-                if (e.key === 'k' || e.key === 'K') this.playerTakeDamage(); // Debug hotkey
             }
         });
 
         window.addEventListener('keyup', (e) => {
             this.keys[e.key] = false;
+        });
+
+        // Pause menu
+        document.getElementById('pause-btn').addEventListener('click', () => this.pauseGame());
+        document.getElementById('btn-resume').addEventListener('click', () => this.resumeGame());
+        document.getElementById('btn-pause-map').addEventListener('click', () => {
+            // Leaves this run (like World Map on the Game Over screen)
+            this.closePauseMenu();
+            audioManager.stopAllMusic();
+            this.showWorldMap();
+        });
+        document.getElementById('btn-mute').addEventListener('click', () => {
+            audioManager.setMuted(!audioManager.muted);
+            this.updateMuteButton();
+        });
+        // Back to the Sheepy Games homepage: only offered when the game is played on the website
+        // (not in the Android app, or when testing on this computer)
+        if (this.isOnSheepyGamesSite()) {
+            const home = document.getElementById('btn-sheepy-games');
+            home.style.display = '';
+            home.addEventListener('click', () => { window.location.href = '/'; });
+        }
+
+        // Pause by itself when the tab or app is hidden, so the music stops and nothing is going on
+        // when the player comes back. A level that starts while hidden pauses too (see startGame).
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) return;
+            this.pauseGame();
+            audioManager.stopThemeMusic(); // the title tune starts again with the next tap
         });
 
         window.addEventListener('resize', () => this.handleResize());
@@ -367,6 +405,7 @@ class GameEngine {
     }
 
     handleAction() {
+        if (this.paused) return;
         if (gameState.gameState === 'PLAYING' && !gameState.isSheepy && this.player.position.y <= 0.5) {
             gameState.playerVelY = 0.6;
         }
@@ -387,15 +426,59 @@ class GameEngine {
         this.uiElements.uiLayer.style.display = 'block';
 
         this.showLevelSplash(LEVELS[gameState.currentLevelName]);
-
-        this.uiElements.joystickContainer.style.display = 'block';
-        this.uiElements.actionButton.style.display = 'flex';
+        this.setTouchControls(true);
 
         gameState.gameState = 'PLAYING';
         gameState.updateUI();
 
         audioManager.init();
         audioManager.playBaa(220);
+
+        // The next level can start while the tab or app is hidden (the level-complete banner's timer
+        // keeps going): start it paused, so the player comes back to the pause menu
+        if (document.hidden) this.pauseGame();
+    }
+
+    // Joystick, jump and pause buttons: only on screen while a level is being played
+    setTouchControls(visible) {
+        this.uiElements.joystickContainer.style.display = visible ? 'block' : 'none';
+        this.uiElements.actionButton.style.display = visible ? 'flex' : 'none';
+        document.getElementById('pause-btn').style.display = visible ? 'block' : 'none';
+        if (!visible) this.resetJoy(document.getElementById('joystick-knob'));
+    }
+
+    // ---------- Pause menu ----------
+
+    isOnSheepyGamesSite() {
+        return /(^|\.)sheepygames\.io$/i.test(window.location.hostname);
+    }
+
+    // Pause during a level or the bonus round: everything stands still and the tune stops where it is
+    pauseGame() {
+        const playing = gameState.gameState === 'PLAYING' || gameState.gameState === 'BONUS';
+        if (!playing || this.paused) return;
+        this.paused = true;
+        this.keys = {};
+        this.resetJoy(document.getElementById('joystick-knob'));
+        this.hideLevelSplash();
+        audioManager.pauseGameMusic();
+        this.updateMuteButton();
+        document.getElementById('pause-menu').style.display = 'flex';
+    }
+
+    resumeGame() {
+        if (!this.paused) return;
+        this.closePauseMenu();
+        audioManager.resumeGameMusic();
+    }
+
+    closePauseMenu() {
+        this.paused = false;
+        document.getElementById('pause-menu').style.display = 'none';
+    }
+
+    updateMuteButton() {
+        document.getElementById('btn-mute').textContent = audioManager.muted ? '🔇 Sound: Off' : '🔊 Sound: On';
     }
 
     // "LEVEL 3" with "❄️ Snowy Peaks" underneath, shown for 2.5s as a level starts
@@ -430,8 +513,7 @@ class GameEngine {
         this.hideLevelSplash();
         this.uiElements.gameOverScreen.style.display = 'none';
         this.uiElements.uiLayer.style.display = 'none';
-        this.uiElements.joystickContainer.style.display = 'none';
-        this.uiElements.actionButton.style.display = 'none';
+        this.setTouchControls(false);
         document.getElementById('leaderboard-modal').style.display = 'none';
         this.uiElements.startScreen.style.display = 'flex'; // behind the map, so Back returns to the title
         this.renderWorldMap();
@@ -528,6 +610,7 @@ class GameEngine {
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        if (this.paused) this.renderer.render(this.scene, this.camera); // resizing clears the canvas
     }
 
     updatePlayerMovement(frameScale) {
@@ -787,6 +870,7 @@ class GameEngine {
         audioManager.playBaa(440);
         audioManager.stopAllMusic();
         this.uiElements.uiLayer.style.display = 'none';
+        this.setTouchControls(false); // nothing to steer during the banner
         this.hideLevelSplash();
 
         const levelName = gameState.currentLevelName;
@@ -849,6 +933,8 @@ class GameEngine {
         this.touchId = null;
         this.joyIn = { x: 0, y: 0 };
         this.sparkBudget = 0;
+        this.invincibleTime = 0;
+        this.closePauseMenu();
 
         gameState.init(audioManager, this, levelName, resetLives);
         this.applyAtmosphere(LEVELS[levelName]);
@@ -870,19 +956,23 @@ class GameEngine {
         if (gameState.lives > 0) {
             this.player.position.set(0, 0, 0);
             gameState.isInvincible = true;
-
-            let flashCount = 0;
-            const flashInterval = setInterval(() => {
-                if (this.player) this.player.visible = !this.player.visible;
-                flashCount++;
-                if (flashCount > 15) {
-                    clearInterval(flashInterval);
-                    if (this.player) this.player.visible = true;
-                    gameState.isInvincible = false;
-                }
-            }, 200);
+            this.invincibleTime = INVINCIBLE_SECONDS; // counted down in updateInvincibility
         } else {
             this.triggerGameOver();
+        }
+    }
+
+    // After losing a life Sheepy flashes (0.2s on, 0.2s off) and can't be hurt for INVINCIBLE_SECONDS
+    updateInvincibility(deltaTime) {
+        if (this.invincibleTime <= 0) return;
+        this.invincibleTime -= deltaTime;
+        if (this.invincibleTime <= 0) {
+            this.invincibleTime = 0;
+            this.player.visible = true;
+            gameState.isInvincible = false;
+        } else {
+            const elapsed = INVINCIBLE_SECONDS - this.invincibleTime;
+            this.player.visible = Math.floor(elapsed / 0.2) % 2 === 0;
         }
     }
 
@@ -890,6 +980,7 @@ class GameEngine {
         gameState.gameState = 'GAME_OVER';
         this.hideLevelSplash();
         this.uiElements.uiLayer.style.display = 'none';
+        this.setTouchControls(false);
         this.uiElements.gameOverScreen.style.display = 'flex';
 
         audioManager.playBaa(50);
@@ -1177,6 +1268,10 @@ class GameEngine {
         gameState.lastTime = timestamp;
         const frameScale = deltaTime * TUNING_FPS; // 1.0 at 60fps, 0.5 at 120fps
 
+        // Paused: everything stands still. The canvas keeps showing the last frame, so there's
+        // nothing to draw (handleResize draws once if the window changes size)
+        if (this.paused) return;
+
         // Background effect keeps going even on the level-complete banner (snow keeps falling)
         AmbientEffects.update(deltaTime, this.player.position);
         Scenery.update(deltaTime, this.camera); // smoke and glowing lava keep going too
@@ -1187,6 +1282,7 @@ class GameEngine {
             return;
         }
 
+        this.updateInvincibility(deltaTime);
         this.updatePlayerMovement(frameScale);
         this.updateCoins(frameScale);
         ParticleSystem.updateParticles(frameScale);

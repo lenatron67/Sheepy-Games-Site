@@ -254,6 +254,44 @@
             transition: transform 0.1s; display: none;
         }
         #action-btn:active { transform: scale(0.9); background: rgba(255, 105, 180, 0.8); }
+
+        /* Pause button (under the lives, top right) and the pause menu */
+        #pause-btn {
+            position: absolute; top: 72px; right: 20px; width: 56px; height: 56px; box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.85); border: 3px solid black; border-radius: 50%;
+            box-shadow: 3px 3px 0 black; z-index: 12; display: none; cursor: pointer; padding: 0;
+            -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        }
+        #pause-btn::before, #pause-btn::after {
+            content: ''; position: absolute; top: 14px; width: 8px; height: 22px;
+            background: #1a1a1a; border-radius: 2px;
+        }
+        #pause-btn::before { left: 14px; }
+        #pause-btn::after { right: 14px; }
+        #pause-btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 black; }
+        #pause-menu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.55); z-index: 250; display: none;
+            justify-content: center; align-items: center;
+            font-family: 'Bangers', cursive;
+        }
+        #pause-panel {
+            display: flex; flex-direction: column; align-items: center;
+            padding: 2.5vmin 5vmin 3.5vmin; max-height: 92%; box-sizing: border-box;
+            background-color: #f0f0f0;
+            background-image: radial-gradient(#4facfe 15%, transparent 16%), radial-gradient(#4facfe 15%, transparent 16%);
+            background-size: 20px 20px; background-position: 0 0, 10px 10px;
+            border: 4px solid black; box-shadow: 10px 10px 0 black;
+        }
+        #pause-title {
+            font-size: clamp(40px, 11vmin, 80px); color: #FFD700; line-height: 1;
+            -webkit-text-stroke: 2px black; text-shadow: 4px 4px 0 #FF69B4, 7px 7px 0 #000;
+            transform: rotate(-3deg); margin-bottom: 1.5vmin;
+        }
+        #pause-panel .menu-btn {
+            font-size: clamp(24px, 5.2vmin, 34px); padding: 0.3em 1.2em; margin: max(5px, 1.1vmin);
+            min-width: 8.5em;
+        }
     </style>
 </head>
 <body>
@@ -351,6 +389,18 @@
     
     <div id="joystick-container"><div id="joystick-knob"></div></div>
     <div id="action-btn">🐑</div>
+    <button id="pause-btn" aria-label="Pause"></button>
+
+    <!-- Pause menu: the Sheepy Games button only shows when the game is played on sheepygames.io -->
+    <div id="pause-menu">
+        <div id="pause-panel">
+            <div id="pause-title">Paused</div>
+            <button id="btn-resume" class="menu-btn">Resume</button>
+            <button id="btn-pause-map" class="menu-btn secondary">World Map</button>
+            <button id="btn-mute" class="menu-btn secondary">Sound: On</button>
+            <button id="btn-sheepy-games" class="menu-btn secondary" style="display: none;">🏠 Sheepy Games</button>
+        </div>
+    </div>
     <div id="canvas-container"></div>
     
     <!-- Option 1 Splash Screen -->
@@ -377,8 +427,8 @@ COMPLETE!</div>
     <script src="js/assets.js?v=12"></script>
     <script src="js/scenery.js?v=7"></script>
     <script src="js/outskirts.js?v=3"></script>
-    <script src="js/audio.js?v=7"></script>
+    <script src="js/audio.js?v=8"></script>
     <script src="js/state.js?v=8"></script>
-    <script src="js/main.js?v=17"></script>
+    <script src="js/main.js?v=18"></script>
 </body>
 </html>
