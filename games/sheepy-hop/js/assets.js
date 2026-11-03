@@ -1314,9 +1314,15 @@ const ModelCreator = {
     createFencePerimeter(size) {
         const group = new THREE.Group();
         const halfSize = size / 2;
-        // Rail geometries depend on size so are created per call, but shared across the 8 rail meshes
-        const railGeometryX = new THREE.BoxGeometry(size, 0.3, 0.2);
-        const railGeometryZ = new THREE.BoxGeometry(0.2, 0.3, size);
+        // Rail geometries depend on the fence size, so they're made the first time a size is needed
+        // and then kept (every world's fence is the same size). Making new ones for every level used
+        // to leave the old ones on the graphics card.
+        _Geo.fenceRails = _Geo.fenceRails || {};
+        if (!_Geo.fenceRails[size]) {
+            _Geo.fenceRails[size] = { x: new THREE.BoxGeometry(size, 0.3, 0.2), z: new THREE.BoxGeometry(0.2, 0.3, size) };
+        }
+        const railGeometryX = _Geo.fenceRails[size].x;
+        const railGeometryZ = _Geo.fenceRails[size].z;
 
         for (let i = -halfSize; i <= halfSize; i += 5) {
             const post1 = new THREE.Mesh(_Geo.fencePost, _Mat.wood);

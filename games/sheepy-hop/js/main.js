@@ -131,39 +131,53 @@ class GameEngine {
         this.scene.fog = new THREE.Fog(level.skyColor, a.fogNear, a.fogFar);
     }
 
+    // One ambient light and one sun for the whole game, recoloured for each world. (New lights every
+    // level used to leave each old sun's shadow texture behind on the graphics card.)
     createLighting() {
-        const a = LEVELS[gameState.currentLevelName].atmosphere;
-        const ambientLight = new THREE.AmbientLight(a.ambientColor, a.ambientIntensity);
-        this.scene.add(ambientLight);
+        if (!this.sunLight) {
+            this.ambientLight = new THREE.AmbientLight();
 
-        // The sun follows Sheepy (see updateCamera) so its ±30 shadow area is always around the player
-        const dirLight = new THREE.DirectionalLight(a.sunColor, a.sunIntensity);
-        dirLight.position.set(20, 40, 20);
-        dirLight.castShadow = true;
-        dirLight.shadow.camera.right = 30;
-        dirLight.shadow.camera.left = -30;
-        dirLight.shadow.camera.top = 30;
-        dirLight.shadow.camera.bottom = -30;
-        this.scene.add(dirLight);
-        this.scene.add(dirLight.target);
-        this.sunLight = dirLight;
+            // The sun follows Sheepy (see updateCamera) so its ±30 shadow area is always around the player
+            const dirLight = new THREE.DirectionalLight();
+            dirLight.castShadow = true;
+            dirLight.shadow.camera.right = 30;
+            dirLight.shadow.camera.left = -30;
+            dirLight.shadow.camera.top = 30;
+            dirLight.shadow.camera.bottom = -30;
+            this.sunLight = dirLight;
+        }
+        const a = LEVELS[gameState.currentLevelName].atmosphere;
+        this.ambientLight.color.setHex(a.ambientColor);
+        this.ambientLight.intensity = a.ambientIntensity;
+        this.sunLight.color.setHex(a.sunColor);
+        this.sunLight.intensity = a.sunIntensity;
+        this.sunLight.position.set(20, 40, 20);
+        this.sunLight.target.position.set(0, 0, 0);
+        // A level change empties the scene, so they go back in each time
+        this.scene.add(this.ambientLight);
+        this.scene.add(this.sunLight);
+        this.scene.add(this.sunLight.target);
     }
 
+    // The ground is made once per world and kept for later visits: painting its texture again on
+    // every level change was slow, and left the old ground on the graphics card. Every world's
+    // ground is the same size, so they share one plane.
     createGround() {
-        const levelName = gameState.currentLevelName;
-        const level = LEVELS[levelName];
-        const groundGeometry = new THREE.PlaneGeometry(level.GROUND_SIZE, level.GROUND_SIZE);
+        const level = LEVELS[gameState.currentLevelName];
+        this.groundMaterials = this.groundMaterials || {};
+        let material = this.groundMaterials[level.groundType];
+        if (!material) {
+            const texture = TextureGenerator[level.groundType]();
+            texture.repeat.set(level.GROUND_SIZE / 8, level.GROUND_SIZE / 8); // one tile every 8 units
+            material = new THREE.MeshStandardMaterial({ map: texture, roughness: 1, metalness: 0 });
+            this.groundMaterials[level.groundType] = material;
+        }
+        this.groundGeometries = this.groundGeometries || {};
+        if (!this.groundGeometries[level.GROUND_SIZE]) {
+            this.groundGeometries[level.GROUND_SIZE] = new THREE.PlaneGeometry(level.GROUND_SIZE, level.GROUND_SIZE);
+        }
 
-        const texture = TextureGenerator[level.groundType]();
-        texture.repeat.set(level.GROUND_SIZE / 8, level.GROUND_SIZE / 8); // one tile every 8 units
-
-        const groundMaterial = new THREE.MeshStandardMaterial({
-            map: texture,
-            roughness: 1,
-            metalness: 0
-        });
-
-        this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        this.ground = new THREE.Mesh(this.groundGeometries[level.GROUND_SIZE], material);
         this.ground.rotation.x = -Math.PI / 2;
         this.ground.receiveShadow = true;
         this.scene.add(this.ground);
