@@ -269,6 +269,40 @@ function candyMaterial() {
     return sceneryCached('candyMat', () => new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 70, specular: 0x555555 }));
 }
 
+// ---------- Cloud Kingdom shapes (the obstacles, the outskirts and the landmarks) ----------
+
+// Hot-air balloon with its basket on the ground (y = 0), the balloon striped in colours a and b
+// round it. About 6.5 high. Use as a mergePieces piece with no color.
+function hotAirBalloonGeo(a, b) {
+    return sceneryCached(`hotAirBalloon${a},${b}`, () => {
+        // Each triangle of the balloon takes the colour of its slice, for crisp stripes
+        const env = new THREE.SphereGeometry(1.6, 12, 9).toNonIndexed();
+        const pos = env.attributes.position, colours = [], ca = new THREE.Color(a), cb = new THREE.Color(b);
+        for (let i = 0; i < pos.count; i += 3) {
+            const cx = pos.getX(i) + pos.getX(i + 1) + pos.getX(i + 2), cz = pos.getZ(i) + pos.getZ(i + 1) + pos.getZ(i + 2);
+            const c = Math.floor((Math.atan2(cz, cx) + Math.PI) / (Math.PI * 2) * 12) % 2 ? ca : cb;
+            for (let k = 0; k < 3; k++) colours.push(c.r, c.g, c.b);
+        }
+        env.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+        const B = new THREE.BoxGeometry(1, 1, 1);
+        const pieces = [
+            { geo: B, color: '#a8743c', pos: [0, 0.4, 0], scale: [1.0, 0.8, 1.0] },     // wicker basket
+            { geo: B, color: '#7a5028', pos: [0, 0.83, 0], scale: [1.08, 0.1, 1.08] }, // its rim
+            { geo: env, pos: [0, 4.4, 0], scale: [1, 1.15, 1] },
+            { geo: new THREE.CylinderGeometry(0.75, 0.45, 0.6, 12, 1, true), color: a, pos: [0, 2.55, 0] } // skirt under the balloon
+        ];
+        [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([sx, sz]) => {
+            pieces.push({ geo: new THREE.CylinderGeometry(0.025, 0.025, 1.5, 3), color: '#5a4030', pos: [sx * 0.38, 1.6, sz * 0.38], rot: [sz * 0.12, 0, -sx * 0.12] });
+        });
+        return mergePieces(pieces);
+    });
+}
+
+// Soft, smooth vertex-coloured material for clouds (the same as the cloud obstacles use)
+function fluffMaterial() {
+    return _Mat.fluff;
+}
+
 // A flat strip along a curve through `points` (on the ground), `width` wide. The texture repeats
 // every `texLength` units along it, and the strip narrows to nothing over the last `taper` of
 // its length, so it fades out instead of stopping. One draw call.
@@ -1462,6 +1496,135 @@ const SceneryModels = {
         const globe = new THREE.Mesh(parts.globe, parts.globeMat); // casts no shadow: it's glass
         globe.position.y = parts.globeY;
         group.add(globe);
+        return group;
+    },
+
+    // Cloud Kingdom landmark: a white castle with pointed roofs, on a cloud that bobs gently in the
+    // sky. Gate facing south. 13 across, 14 high. Solid square in levels.js.
+    createSkyCastle() {
+        const parts = sceneryCached('skyCastle', () => {
+            const WALL = '#f6f2fc', SHADE = '#ddd5ee', ROOF = '#7f8ef0', ROOF_DARK = '#6a78d8', GOLD = '#e8b93a';
+            const DOOR = '#5d4f8e', WINDOW = '#ffd98a', FLAG = '#ff7ab8';
+            const B = new THREE.BoxGeometry(1, 1, 1);
+            const box = (color, s, p) => ({ geo: B, color, scale: s, pos: p });
+            const pieces = [];
+            const BASE = 0.6; // the castle stands on its cloud
+            // The keep, with battlements along its top
+            pieces.push(box(WALL, [6.4, 5.2, 5.2], [0, BASE + 2.6, -0.4]));
+            for (let k = 0; k < 7; k++) {
+                pieces.push(box(SHADE, [0.55, 0.55, 0.55], [-2.9 + k * 0.97, BASE + 5.47, 2.0]));
+                pieces.push(box(SHADE, [0.55, 0.55, 0.55], [-2.9 + k * 0.97, BASE + 5.47, -2.8]));
+            }
+            // Gate (arched), with gold trim, and windows glowing in the sunset
+            pieces.push(box(DOOR, [1.6, 2.0, 0.2], [0, BASE + 1.0, 2.25]));
+            pieces.push({ geo: new THREE.CylinderGeometry(0.8, 0.8, 0.2, 12, 1, false, 0, Math.PI), color: DOOR, pos: [0, BASE + 2.0, 2.25], rot: [Math.PI / 2, Math.PI / 2, 0] });
+            pieces.push(box(GOLD, [2.0, 0.16, 0.24], [0, BASE + 0.08, 2.3]));
+            [[-1.9, 3.3], [1.9, 3.3], [-1.9, 1.5], [1.9, 1.5]].forEach(([x, y]) => pieces.push(box(WINDOW, [0.6, 0.85, 0.12], [x, BASE + y, 2.25])));
+            // Four corner towers and a tall middle one, with pointed roofs, gold tips and flags
+            const tower = (x, z, r, h, y0) => {
+                pieces.push({ geo: new THREE.CylinderGeometry(r, r * 1.05, h, 12), color: WALL, pos: [x, y0 + h / 2, z] });
+                pieces.push({ geo: new THREE.CylinderGeometry(r * 1.15, r * 1.15, 0.3, 12), color: GOLD, pos: [x, y0 + h, z] });
+                pieces.push({ geo: new THREE.ConeGeometry(r * 1.3, r * 2.2, 12), color: x === 0 ? ROOF : ROOF_DARK, pos: [x, y0 + h + 0.15 + r * 1.1, z] });
+                pieces.push({ geo: new THREE.CylinderGeometry(0.04, 0.04, 0.9, 4), color: GOLD, pos: [x, y0 + h + 0.15 + r * 2.2 + 0.4, z] });
+                pieces.push({ geo: new THREE.ConeGeometry(0.25, 0.6, 3), color: FLAG, pos: [x + 0.3, y0 + h + 0.15 + r * 2.2 + 0.65, z], rot: [0, 0, -Math.PI / 2], scale: [1, 1, 0.3] });
+                pieces.push(box(WINDOW, [0.38, 0.6, 0.1], [x, y0 + h * 0.6, z + r * 0.98]));
+            };
+            tower(-3.6, 1.9, 1.05, 6.4, BASE);
+            tower(3.6, 1.9, 1.05, 6.4, BASE);
+            tower(-3.6, -2.6, 1.0, 5.8, BASE);
+            tower(3.6, -2.6, 1.0, 5.8, BASE);
+            tower(0, -0.6, 1.35, 3.6, BASE + 5.2);
+            // The cloud it stands on, wider than the castle
+            const PUFF = new THREE.IcosahedronGeometry(1, 1);
+            const CLOUD = ['#ffffff', '#f4eefc', '#fbeff6', '#eef0fc'];
+            const puffs = [];
+            for (let k = 0; k < 14; k++) {
+                const a = (k / 14) * Math.PI * 2, r = 4.6 + (k % 3) * 0.45, s = 1.4 + ((k * 7) % 5) * 0.18;
+                if (Math.cos(a) > 0.93) continue; // leave the gate clear
+                puffs.push({ geo: PUFF, color: CLOUD[k % CLOUD.length], pos: [Math.sin(a) * r, 0.5, Math.cos(a) * r * 0.9 - 0.4], scale: [s, s * 0.6, s] });
+            }
+            return { castle: mergePieces(pieces), cloud: mergePieces(puffs) };
+        });
+
+        const group = new THREE.Group();
+        const castle = new THREE.Mesh(parts.castle, vertexColourMaterial());
+        castle.castShadow = true;
+        const cloud = new THREE.Mesh(parts.cloud, fluffMaterial());
+        cloud.castShadow = true;
+        // Castle and cloud bob together, gently; the solid square stays put
+        const floating = new THREE.Group();
+        floating.add(castle, cloud);
+        group.add(floating);
+        group.userData.update = (dt, t) => { floating.position.y = Math.sin(t * 0.6) * 0.15; };
+        return group;
+    },
+
+    // Cloud Kingdom ground detail: a path of white marble tiles edged in gold, from the castle gate
+    // towards the middle
+    createMarblePath(level, solids) {
+        const texture = sceneryCached('marblePathTex', () => {
+            const W = 128, H = 256;
+            const [canvas, ctx] = makeCanvas(W, H);
+            for (let k = 0; k < 2; k++) { // two tiles per repeat, so they come out square
+                const y0 = k * H / 2;
+                roundRectPath(ctx, 5, y0 + 5, W - 10, H / 2 - 10, 6);
+                ctx.fillStyle = '#e9e4f0';
+                ctx.fill();
+                ctx.lineWidth = 5;
+                ctx.strokeStyle = '#d9a83a'; // gold edging
+                ctx.stroke();
+                ctx.save();
+                ctx.clip();
+                for (let v = 0; v < 3; v++) { // faint grey veins
+                    ctx.strokeStyle = 'rgba(150, 140, 170, 0.35)';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    let x = Math.random() * W, y = y0 + Math.random() * H / 2;
+                    ctx.moveTo(x, y);
+                    for (let i = 0; i < 6; i++) { x += (Math.random() - 0.3) * 30; y += (Math.random() - 0.5) * 30; ctx.lineTo(x, y); }
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        });
+        return pathFromLandmark(level, texture, 3.0, 0.02);
+    },
+
+    // Cloud Kingdom second landmark: a giant rainbow arching north-south, its feet in two clouds.
+    // Only the feet are solid (userData.colliders), so Sheepy and the enemies can go under it.
+    createRainbowArch() {
+        const R = 8.5, BAND = 0.48;
+        const parts = sceneryCached('rainbowArch', () => {
+            const BANDS = ['#e53935', '#ff9800', '#fdd835', '#43a047', '#1e88e5', '#8e24aa'];
+            const arch = mergePieces(BANDS.map((c, k) => ({
+                geo: new THREE.TorusGeometry(R - BAND / 2 - k * BAND, BAND / 2, 4, 36, Math.PI),
+                color: c, rot: [0, Math.PI / 2, 0], scale: [1, 1, 1.6] // deeper than a band is wide, so it doesn't look thin from the side
+            })));
+            const PUFF = new THREE.IcosahedronGeometry(1, 1);
+            const CLOUD = ['#ffffff', '#f4eefc', '#fbeff6'];
+            const feet = [];
+            const foot = R - BAND * 3; // the middle of the bands
+            [-1, 1].forEach(side => {
+                [[0, 0.5, 0, 1.7], [0.9, 0.4, 0.8, 1.2], [-0.9, 0.45, 0.6, 1.25], [0.6, 0.35, -0.9, 1.1], [-0.7, 0.9, -0.6, 1.1], [0, 1.4, 0.2, 1.0]]
+                    .forEach(([x, y, z, r], k) => feet.push({ geo: PUFF, color: CLOUD[k % CLOUD.length], pos: [x, y, side * foot + z * side], scale: [r, r * 0.75, r] }));
+            });
+            return { arch, feet: mergePieces(feet), foot };
+        });
+
+        const group = new THREE.Group();
+        const arch = new THREE.Mesh(parts.arch, candyMaterial());
+        arch.castShadow = true;
+        group.add(arch);
+        const feet = new THREE.Mesh(parts.feet, fluffMaterial());
+        feet.castShadow = true;
+        group.add(feet);
+        group.userData.colliders = [-1, 1].map(side => ({ x: 0, z: side * parts.foot, radius: 2.0 }));
+        // Obstacles keep out from under the arch, where they'd poke through the bands
+        group.userData.keepClear = [];
+        for (let z = -R; z <= R; z += 2) group.userData.keepClear.push({ x: 0, z, r: 3 });
         return group;
     }
 };

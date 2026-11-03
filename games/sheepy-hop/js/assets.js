@@ -337,6 +337,52 @@ const TextureGenerator = {
         texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.set(25, 25);
         return texture;
+    },
+
+    // Cloud Kingdom: a soft lavender cloud floor, billowing in lighter and darker puffs, with a
+    // few glints of sunset gold. Darker than it looks in the game: the lights brighten it about 1.25x.
+    generateCloudTexture() {
+        const size = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#9e92ba';
+        ctx.fillRect(0, 0, size, size);
+
+        // Drawn again a tile over in each direction, so the texture repeats without seams
+        const puff = (x, y, r, colour) => {
+            for (const dx of [-size, 0, size]) {
+                for (const dy of [-size, 0, size]) {
+                    const g = ctx.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r);
+                    g.addColorStop(0, colour);
+                    g.addColorStop(1, 'rgba(158, 146, 186, 0)');
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        };
+        // Billows: soft shadowy hollows first, then lighter puffs (a few pinker, a few bluer)
+        for (let i = 0; i < 14; i++) puff(Math.random() * size, Math.random() * size, 40 + Math.random() * 60, 'rgba(120, 108, 160, 0.35)');
+        for (let i = 0; i < 40; i++) {
+            const tint = i % 5 === 0 ? 'rgba(200, 170, 205, 0.4)' : i % 5 === 1 ? 'rgba(165, 175, 220, 0.35)' : 'rgba(190, 182, 220, 0.4)';
+            puff(Math.random() * size, Math.random() * size, 18 + Math.random() * 40, tint);
+        }
+
+        // A few glints of gold from the sunset
+        for (let i = 0; i < 160; i++) {
+            ctx.fillStyle = `rgba(255, 225, 160, ${0.35 + Math.random() * 0.4})`;
+            ctx.fillRect(Math.random() * size, Math.random() * size, 1.5, 1.5);
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(25, 25);
+        return texture;
     }
 };
 
@@ -524,6 +570,32 @@ const _Geo = {
         geo.computeVertexNormals();
         return geo;
     })(),
+    // Cloud Kingdom
+    // Five-pointed star with slim points (the beach's starfish are chubbier and gold), standing up
+    skyStar: (() => {
+        const shape = new THREE.Shape();
+        for (let i = 0; i < 10; i++) {
+            const a = (i / 10) * Math.PI * 2 + Math.PI / 2;
+            const r = i % 2 === 0 ? 0.92 : 0.4;
+            if (i === 0) shape.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+            else shape.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        shape.closePath();
+        const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.14, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.05, bevelSegments: 1 });
+        geo.translate(0, 0, -0.07);
+        return geo;
+    })(),
+    // A lightning bolt, hanging point-down under a storm cloud
+    lightningBolt: (() => {
+        const shape = new THREE.Shape();
+        [[0.05, 0.5], [0.3, 0.5], [0.12, 0.08], [0.32, 0.08], [-0.12, -0.6], [0.0, -0.12], [-0.2, -0.12]].forEach(([x, y], i) => {
+            if (i === 0) shape.moveTo(x, y); else shape.lineTo(x, y);
+        });
+        shape.closePath();
+        const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.08, bevelEnabled: false });
+        geo.translate(0, 0, -0.04);
+        return geo;
+    })(),
 };
 
 // Shared materials — created once at startup, reused by every mesh instance
@@ -611,6 +683,13 @@ const _Mat = {
     chocolateCoin: new THREE.MeshStandardMaterial({ color: 0xFFD24A, metalness: 0.45, roughness: 0.28, emissive: 0x4a3600, flatShading: true }),
     // The blobs' faces: one material shared by every blob (only the jelly body changes colour)
     jellyFace:     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35 }),
+    // Cloud Kingdom
+    skyStar:       new THREE.MeshStandardMaterial({ color: 0xffe866, roughness: 0.3, metalness: 0.1, emissive: 0x7a5c00 }),
+    rainbowCoin:   new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.35, emissive: 0x2a2000 }),
+    // Soft, smooth vertex-coloured material for clouds, candyfloss and the cloud obstacles
+    fluff:         new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 }),
+    stormFace:     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5 }),
+    lightning:     new THREE.MeshBasicMaterial({ color: 0xfff27a }), // unlit, so it glows
 };
 
 // 3D Model creation functions
@@ -1683,6 +1762,148 @@ const ModelCreator = {
             tongueMesh: face,            // shared face material: it stays white either way
             tongueMeshNormalColor: 0xffffff,
             blob
+        };
+        return group;
+    },
+
+    // ---------- Cloud Kingdom ----------
+
+    createSkyStar() {
+        const star = new THREE.Mesh(_Geo.skyStar, _Mat.skyStar);
+        star.castShadow = true;
+        return star;
+    },
+
+    // Gold coin with a little rainbow on each face, between two puffs of cloud. Faces the camera.
+    createRainbowCoin() {
+        const geo = sceneryCached('rainbowCoin', () => {
+            const BANDS = ['#e53935', '#ff9800', '#fdd835', '#43a047', '#1e88e5', '#8e24aa'];
+            const PUFF = new THREE.IcosahedronGeometry(1, 0);
+            const pieces = [{ geo: new THREE.CylinderGeometry(0.85, 0.85, 0.16, 24), color: '#ffd23a', rot: [Math.PI / 2, 0, 0] }];
+            [1, -1].forEach(side => {
+                const z = side * 0.085, turn = side > 0 ? 0 : Math.PI;
+                BANDS.forEach((c, k) => {
+                    const outer = 0.66 - k * 0.07;
+                    pieces.push({ geo: new THREE.RingGeometry(outer - 0.07, outer, 12, 1, 0, Math.PI), color: c, pos: [0, -0.18, z], rot: [0, turn, 0] });
+                });
+                [-0.48, 0.48].forEach(x => pieces.push({ geo: PUFF, color: '#ffffff', pos: [x, -0.2, z], scale: [0.16, 0.11, 0.05] }));
+            });
+            return mergePieces(pieces);
+        });
+        const coin = new THREE.Mesh(geo, _Mat.rainbowCoin);
+        coin.castShadow = true;
+        return coin;
+    },
+
+    // Candyfloss bonus item: a fluffy pink cloud of it on a paper stick. Centred on its middle,
+    // as it tumbles.
+    createCandyfloss() {
+        const variants = sceneryCached('candyfloss', () => {
+            const PUFF = new THREE.IcosahedronGeometry(1, 1);
+            const build = colours => {
+                const pieces = [{ geo: new THREE.CylinderGeometry(0.05, 0.06, 1.3, 6), color: '#fbf6ee', pos: [0, -0.55, 0] }];
+                [[0, 0.35, 0, 0.55], [-0.35, 0.2, 0.1, 0.42], [0.36, 0.22, 0.05, 0.42], [0.05, 0.25, -0.35, 0.42],
+                 [0.0, 0.62, 0.05, 0.4], [-0.15, 0.1, 0.32, 0.36], [0.2, 0.05, 0.3, 0.34]]
+                    .forEach(([x, y, z, r], k) => pieces.push({ geo: PUFF, color: colours[k % colours.length], pos: [x, y, z], scale: [r, r, r] }));
+                return mergePieces(pieces);
+            };
+            return [build(['#ff9ccf', '#ffb3db', '#ff8ac4']), build(['#9fd8ff', '#b8e4ff', '#ffb3db']), build(['#d2b0ff', '#ff9ccf', '#e6ccff'])];
+        });
+        const floss = new THREE.Mesh(variants[Math.floor(Math.random() * variants.length)], _Mat.fluff);
+        floss.castShadow = true;
+        return floss;
+    },
+
+    // Cloud Kingdom obstacle: a marble column wrapped in cloud, a broken column, a hot-air balloon
+    // tethered to the ground, or a cloud bush. Each is one merged mesh (one draw call) within the
+    // usual 1.5 collision radius (the balloon is wider, but high above Sheepy and the enemies).
+    createCloudObstacle() {
+        const variants = sceneryCached('cloudObstacles', () => {
+            const MARBLE = '#f1ede6', MARBLE_DARK = '#d9d3c8', GOLD = '#e8b93a';
+            const PUFF = new THREE.IcosahedronGeometry(1, 1);
+            const B = new THREE.BoxGeometry(1, 1, 1);
+            const puffs = (list, colours) => list.map(([x, y, z, r], k) => ({ geo: PUFF, color: colours[k % colours.length], pos: [x, y, z], scale: [r, r * 0.8, r] }));
+            const CLOUD = ['#ffffff', '#f3eefc', '#fbf0f6'];
+            const column = () => mergePieces([
+                { geo: B, color: MARBLE_DARK, pos: [0, 0.2, 0], scale: [1.3, 0.4, 1.3] },
+                { geo: new THREE.CylinderGeometry(0.42, 0.48, 4.2, 10, 1, true), color: MARBLE, pos: [0, 2.5, 0] },
+                { geo: new THREE.CylinderGeometry(0.5, 0.5, 0.14, 10), color: GOLD, pos: [0, 4.2, 0] },
+                { geo: B, color: MARBLE_DARK, pos: [0, 4.75, 0], scale: [1.2, 0.35, 1.2] },
+                ...puffs([[0.55, 4.5, 0.2, 0.62], [-0.5, 4.65, -0.1, 0.6], [0.05, 5.15, -0.25, 0.55], [-0.15, 4.35, 0.55, 0.5]], CLOUD)
+            ]);
+            const ruin = () => mergePieces([
+                { geo: B, color: MARBLE_DARK, pos: [0, 0.2, 0], scale: [1.3, 0.4, 1.3] },
+                { geo: new THREE.CylinderGeometry(0.4, 0.48, 2.4, 10), color: MARBLE, pos: [0, 1.6, 0], rot: [0, 0, 0.06] },
+                { geo: new THREE.CylinderGeometry(0.42, 0.42, 1.0, 10), color: MARBLE, pos: [0.95, 0.42, 0.3], rot: [0, 0.5, Math.PI / 2] }, // a fallen piece
+                ...puffs([[-0.7, 0.3, 0.6, 0.45], [0.2, 0.25, -0.8, 0.4]], CLOUD)
+            ]);
+            const balloon = (a, b) => hotAirBalloonGeo(a, b); // from scenery.js (also floats past the fence)
+            const bush = () => mergePieces(puffs([[0, 0.65, 0, 0.9], [-0.85, 0.45, 0.2, 0.65], [0.85, 0.45, 0.1, 0.68], [0.2, 0.5, -0.75, 0.62], [-0.3, 1.1, -0.2, 0.6]], CLOUD));
+            return [
+                column(), column(), ruin(),
+                balloon('#e53935', '#fdd835'), balloon('#1e88e5', '#ffffff'), balloon('#8e24aa', '#ff9ccf'),
+                bush(), bush()
+            ];
+        });
+        const mesh = new THREE.Mesh(variants[Math.floor(Math.random() * variants.length)], _Mat.fluff);
+        mesh.castShadow = true;
+        mesh.rotation.y = Math.random() * Math.PI * 2;
+        const group = new THREE.Group();
+        group.add(mesh);
+        return group;
+    },
+
+    // Storm cloud enemy, facing +z: a grumpy dark cloud floating above the ground, with angry
+    // eyebrows, and a lightning bolt underneath that flickers as it puffs up and stays while it dashes
+    // (see 'storm' in main.js). It's all in an inner group (userData.cloud) so the bob, puff and
+    // stretch don't move the enemy itself, whose collision stays the same. The cloud's colour shows
+    // the AI type, and turns pale grey when scared. Two draw calls (three while the bolt shows).
+    createStormCloud(colorHex) {
+        const group = new THREE.Group();
+        const cloud = new THREE.Group();
+        const BASE_Y = 1.3; // enemies are held 0.5 above the ground: this floats the cloud about 1.8 up
+        cloud.position.y = BASE_Y;
+        group.add(cloud);
+
+        const bodyGeo = sceneryCached('stormBody', () => {
+            const PUFF = new THREE.IcosahedronGeometry(1, 1);
+            return mergePieces([[0, 0, 0, 0.9], [-0.78, -0.1, 0, 0.68], [0.78, -0.1, 0, 0.7], [0, 0.48, -0.1, 0.75],
+                                [-0.42, 0.28, -0.4, 0.6], [0.46, 0.22, -0.45, 0.6], [0, -0.2, 0.35, 0.6]]
+                .map(([x, y, z, r]) => ({ geo: PUFF, color: '#ffffff', pos: [x, y, z], scale: [r, r * 0.85, r] })));
+        });
+        const body = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.95 }));
+        body.castShadow = true;
+        cloud.add(body);
+
+        const faceGeo = sceneryCached('stormFace', () => {
+            const BALL = new THREE.SphereGeometry(1, 8, 6);
+            const pieces = [];
+            [-1, 1].forEach(s => {
+                pieces.push({ geo: BALL, color: '#ffffff', pos: [s * 0.27, 0.13, 0.8], scale: [0.17, 0.15, 0.1] });
+                pieces.push({ geo: BALL, color: '#1a1420', pos: [s * 0.25, 0.1, 0.88], scale: [0.08, 0.08, 0.04] });
+                // Angry eyebrows, sloping down towards the middle
+                pieces.push({ geo: new THREE.BoxGeometry(1, 1, 1), color: '#1a1420', pos: [s * 0.27, 0.33, 0.86], scale: [0.3, 0.07, 0.06], rot: [0, 0, s * 0.4] });
+            });
+            pieces.push({ geo: new THREE.TorusGeometry(0.13, 0.03, 4, 8, Math.PI), color: '#1a1420', pos: [0, -0.18, 0.92], rot: [-0.2, 0, 0] }); // frown
+            return mergePieces(pieces);
+        });
+        const face = new THREE.Mesh(faceGeo, _Mat.stormFace);
+        cloud.add(face);
+
+        const bolt = new THREE.Mesh(_Geo.lightningBolt, _Mat.lightning);
+        bolt.position.set(0.15, -1.05, 0.1);
+        bolt.visible = false;
+        cloud.add(bolt);
+
+        group.userData = {
+            originalColor: colorHex,
+            isScared: false,
+            bodyMesh: body,
+            tongueMesh: face,            // shared face material: it stays white either way
+            tongueMeshNormalColor: 0xffffff,
+            cloud,
+            cloudBaseY: BASE_Y,
+            bolt
         };
         return group;
     }

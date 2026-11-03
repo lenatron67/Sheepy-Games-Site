@@ -1,4 +1,4 @@
-const LEVEL_ORDER = ['MAIN', 'BEACH', 'DESERT', 'SNOW', 'JUNGLE', 'SWEETIE', 'VOLCANO'];
+const LEVEL_ORDER = ['MAIN', 'BEACH', 'DESERT', 'SNOW', 'JUNGLE', 'SWEETIE', 'VOLCANO', 'CLOUD'];
 
 // Enemy difficulty scaling on top of each world's enemySpeed:
 //   +10% for every lap of all the worlds (lap 2 = +10%, lap 3 = +20%, ...)
@@ -36,6 +36,8 @@ const ENEMY_SCALING = {
 //     pounce  - stalks slowly, pounces when close     scuttle - moves sideways in quick pulses
 //     swoop   - waddles, then spreads its wings and swoops fast (the model needs userData.bird and wings)
 //     wobble  - hops along in squashy bounces, wobbling as it lands (the model needs userData.blob)
+//     storm   - drifts, puffs up with a flicker of lightning (a warning), then dashes (the model
+//               needs userData.cloud and userData.bolt)
 const LEVELS = {
     MAIN: {
         // Theme metadata
@@ -407,6 +409,63 @@ const LEVELS = {
         music: {
             melody: 'A4 A4 C5 A4 E5 A4 D5 C5 A4 A4 C5 A4 G4 E4 G4 B4 A4 A4 C5 A4 E5 A4 F5 E5 D5 C5 B4 C5 A4 E4 A4 -',
             bass: ['A2', 'A2', 'F2', 'E2'], tempo: 0.11, wave: 'square', gain: 0.05, drums: 'driving'
+        },
+        // World config
+        PINK_COINS_COUNT: 20,
+        GOLD_COINS_COUNT: 10,
+        TREES_COUNT: 55,
+        WORLD_SIZE: 160,
+        SMALL_WORLD_SIZE: 80,
+        GROUND_SIZE: 400, // well past the fence, so the ground fades into the fog instead of ending
+        COIN_SPAWN_HEIGHT: 1,
+        GOLD_COIN_SPAWN_HEIGHT: 6,
+        TREE_EXCLUSION_ZONE: 5
+    },
+
+    CLOUD: {
+        // Theme metadata
+        biomeName: 'Cloud Kingdom',
+        icon: '☁️',
+        mapColor: '#b7a8e6',
+        skyColor: 0xffd2ac,
+        groundType: 'generateCloudTexture',
+        primaryCoinModel: 'createSkyStar',
+        primaryCoinName: 'Stars',
+        primaryCoinLabel: 'Stars: ',
+        primaryCoinColor: '#ffe45c',
+        goldCoinModel: 'createRainbowCoin',
+        goldCoinName: 'Rainbow Coins',
+        goldCoinColor: '#FFD700',
+        obstacleModel: 'createCloudObstacle',
+        bonusItemModel: 'createCandyfloss',
+        hasEnemies: true,
+        enemyModel: 'createStormCloud',
+        enemyTypes: ['BLINKY', 'BLINKY', 'PINKY', 'PINKY', 'INKY', 'INKY', 'CLYDE', 'CLYDE', 'BLINKY', 'PINKY', 'INKY'],
+        // Stormy shades with a hint of the usual types (plum, mauve, storm blue, charcoal). All dark,
+        // so the pale grey of a scared cloud stands out.
+        enemyColors: [0x5a3a5e, 0x63405f, 0x6e4a72, 0x7a5480, 0x3a4a6e, 0x445a80, 0x4a4a58, 0x55555f, 0x5e3a58, 0x704c74, 0x384868],
+        enemySpeed: 7.17,
+        enemyBehaviour: 'storm',
+        atmosphere: {
+            ambientColor: 0xfff0e6, ambientIntensity: 0.6,
+            sunColor: 0xffe2c0, sunIntensity: 0.8,
+            fogNear: 25, fogFar: 70
+        },
+        ambientEffect: { // golden sunset sparkles drifting on the breeze
+            count: 130, color: 0xffe6b0, size: 0.32, opacity: 0.9,
+            heightMin: 0.5, heightMax: 9, velocity: [1.0, 0.1, 0.3], sway: 0.8, twinkle: true, additive: true
+        },
+        // A floating castle on the north edge with a marble path from its gate, and a giant rainbow
+        // on the west edge that you can run under (only its cloudy feet are solid)
+        landmarks: [
+            { model: 'createSkyCastle', x: 0, z: -51, halfSize: 6.5 },
+            { model: 'createRainbowArch', x: -50, z: 2 }
+        ],
+        groundDetail: 'createMarblePath',
+        outskirts: 'cloud',
+        music: { // a dreamy, floaty tune in C
+            melody: 'C5 E5 G5 C6 B5 G5 E5 - A4 C5 F5 A5 G5 F5 C5 - D5 F5 A5 D6 C6 A5 F5 - G5 - F5 E5 D5 - C5 -',
+            bass: ['C3', 'F2', 'D3', 'G2'], tempo: 0.15, wave: 'triangle', gain: 0.1, drums: 'soft'
         },
         // World config
         PINK_COINS_COUNT: 20,

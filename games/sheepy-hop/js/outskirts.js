@@ -164,6 +164,10 @@ const Outskirts = (() => {
         return mergePieces(batch.pieces);
     }
 
+    // Backdrop and detail are flat-shaded like the landmarks, unless the set asks for `smooth`
+    // shading (Cloud Kingdom: round, soft clouds)
+    const setMaterial = set => (set.smooth ? fluffMaterial() : vertexColourMaterial());
+
     // Unlit vertex-coloured material, for glowing lava
     const glowMaterial = () => sceneryCached('outskirtsGlow', () => new THREE.MeshBasicMaterial({ vertexColors: true }));
     // Separate copy of the landmark material for flocks: three.js would otherwise switch the one
@@ -242,7 +246,7 @@ const Outskirts = (() => {
                 }
             });
         });
-        return [...props.build(vertexColourMaterial()), ...glows.build(glowMaterial(), false)];
+        return [...props.build(setMaterial(set)), ...glows.build(glowMaterial(), false)];
     }
 
     // Small walk-through things in the outer part of the arena, kept off landmarks, paths and
@@ -260,7 +264,7 @@ const Outskirts = (() => {
                 placed++;
             }
         });
-        return batches.build(vertexColourMaterial());
+        return batches.build(setMaterial(set));
     }
 
     // ---------- Animals ----------
@@ -897,10 +901,37 @@ const Outskirts = (() => {
         });
     }
 
+    // Hot-air balloons (Cloud Kingdom). Most drift east with the wind past the north fence; one
+    // that drifts out of sight comes back in on the far side, also out of sight. The rest hang over
+    // the east and west sides, bobbing and turning slowly.
+    function balloons(spec, fence) {
+        return Array.from({ length: spec.count }, (_, i) => {
+            const [a, b] = pick([['#e53935', '#fdd835'], ['#1e88e5', '#ffffff'], ['#8e24aa', '#ff9ccf'], ['#43a047', '#fdd835'], ['#ff9800', '#ffffff']]);
+            const mesh = new THREE.Mesh(hotAirBalloonGeo(a, b), fluffMaterial());
+            const drifting = i % 3 !== 2;
+            const side = Math.random() < 0.5 ? 1 : -1;
+            const z = drifting ? -(fence + rand(14, 34)) : rand(-fence, fence * 0.6);
+            const xHome = side * (fence + rand(14, 26));
+            const y = rand(5, 12), speed = rand(0.7, 1.3), phase = rand(0, TAU), size = rand(1.1, 1.5);
+            mesh.scale.setScalar(size);
+            let x = drifting ? rand(-100, 100) : xHome;
+            mesh.userData.update = (dt, t, camera) => {
+                if (drifting) {
+                    x += speed * dt;
+                    if (x > camera.position.x + 110) x -= 220;
+                    if (x < camera.position.x - 110) x += 220;
+                }
+                mesh.position.set(x + (drifting ? 0 : Math.sin(t * 0.3 + phase) * 2), y + Math.sin(t * 0.8 + phase) * 0.4, z);
+                mesh.rotation.y = t * 0.1 + phase;
+            };
+            return mesh;
+        });
+    }
+
     const ANIMAL_KINDS = {
         walker: walkers, hopper: hoppers, flock: flocks, roller: rollers, geyser: geysers, smoker: smokers,
         sea: seas, sailboat: sailboats, dolphin: dolphins, buoy: buoys, kite: kites,
-        chocolateRiver: chocolateRivers, floater: floaters
+        chocolateRiver: chocolateRivers, floater: floaters, balloon: balloons
     };
 
     // ---------- Shared props ----------
@@ -1575,6 +1606,69 @@ const Outskirts = (() => {
         ]
     };
 
+    // ---------- Cloud Kingdom ----------
+    // Inside the fence the detail is white cloud tufts, lavender and blue flowers, marble pebbles and
+    // feathers: nothing yellow like the stars, pink like the candyfloss, or dark like the storm clouds.
+
+    const CLOUDS = ['#ffffff', '#f4eefc', '#fbeff6', '#eef0fc'];
+    const MARBLE = ['#f1ede6', '#e4dfd6', '#d8d2c8'];
+
+    // A heap of big cloud puffs sitting on the floor
+    const cloudBank = () => cluster(randInt(3, 5), 2.2, (x, z) => {
+        const r = rand(1.6, 3.0);
+        return [part('ball', vary(pick(CLOUDS), 0.02), [x, r * 0.4, z], [r, r * 0.7, r])];
+    });
+
+    const cloudTuft = (size = 1) => cluster(randInt(2, 4), 0.6 * size, (x, z) => {
+        const r = rand(0.3, 0.6) * size;
+        return [part('ball', vary(pick(CLOUDS), 0.02), [x, r * 0.45, z], [r, r * 0.75, r])];
+    });
+
+    // A marble column standing out in the clouds, some with a puff of cloud round the top
+    const marbleColumn = () => {
+        const h = rand(3, 6);
+        const parts = [
+            part('box', MARBLE[1], [0, 0.2, 0], [1.3, 0.4, 1.3]),
+            part('cyl', MARBLE[0], [0, h / 2, 0], [0.45, h, 0.45]),
+            part('box', MARBLE[2], [0, h + 0.15, 0], [1.2, 0.3, 1.2])
+        ];
+        if (Math.random() < 0.6) parts.push(part('ball', '#ffffff', [0.2, h + 0.4, 0], [0.9, 0.6, 0.8]));
+        return parts;
+    };
+
+    // A little island of cloud floating in the air, with a round tree on it
+    const floatingIsland = () => {
+        const y = rand(5, 8);
+        return [
+            part('ball', '#ffffff', [0, y, 0], [2.2, 0.9, 1.8]),
+            part('ball', '#f4eefc', [1.3, y - 0.2, 0.4], [1.3, 0.7, 1.2]),
+            part('ball', '#fbeff6', [-1.2, y - 0.1, -0.3], [1.4, 0.7, 1.2]),
+            part('cyl', '#8a6a4a', [0, y + 1.1, 0], [0.18, 1.4, 0.18]),
+            part('ball', vary('#6cc26a', 0.05), [0, y + 2.2, 0], [1.0, 0.9, 1.0])
+        ];
+    };
+
+    const SKY_FLOWERS = ['#b9a4ff', '#a8c8ff', '#ffffff'];
+    const feather = () => [
+        part('box', '#ffffff', [0, 0.03, 0], [0.12, 0.03, 0.55], [0, 0, 0.1]),
+        part('box', '#d8d2e8', [0, 0.05, 0], [0.02, 0.02, 0.6])
+    ];
+
+    // A sheep with little wings, for the flocks flying past (facing +z, wings hinged at x = 0)
+    const flyingSheep = () => ({
+        body: [
+            part('ball', '#ffffff', [0, 0, 0], [0.45, 0.38, 0.6]),
+            part('ball', '#f4f4f4', [0.15, 0.18, -0.12], 0.3),
+            part('ball', '#ffffff', [-0.15, 0.2, 0.1], 0.3),
+            part('ball', '#2b2b2b', [0, 0.05, 0.62], [0.2, 0.22, 0.24]),
+            part('box', '#2b2b2b', [-0.21, 0.12, 0.58], [0.14, 0.05, 0.08]),
+            part('box', '#2b2b2b', [0.21, 0.12, 0.58], [0.14, 0.05, 0.08]),
+            ...[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx, sz]) => part('box', '#2b2b2b', [sx * 0.18, -0.38, sz * 0.25], [0.08, 0.25, 0.08]))
+        ],
+        left: [part('box', '#ffffff', [0.5, 0.05, 0], [0.8, 0.04, 0.42]), part('box', '#eeeeee', [0.98, 0.05, -0.05], [0.36, 0.035, 0.3])],
+        right: [part('box', '#ffffff', [-0.5, 0.05, 0], [0.8, 0.04, 0.42]), part('box', '#eeeeee', [-0.98, 0.05, -0.05], [0.36, 0.035, 0.3])]
+    });
+
     // ---------- The sets, named by `outskirts` in levels.js ----------
     // Backdrop distances are past the fence. The camera sees about 30-50 units past the east and
     // west fences, and 25-40 past the north one (fog hides the rest), so that's where things go.
@@ -1720,6 +1814,28 @@ const Outskirts = (() => {
                 { count: 30, prop: meringues },
                 { count: 30, prop: chocChips },
                 { count: 15, prop: () => peppermint(rand(0.3, 0.4)) }
+            ]
+        },
+
+        cloud: {
+            smooth: true, // round, soft clouds
+            animals: [
+                { kind: 'balloon', count: 7 },
+                { kind: 'flock', name: 'flyingSheep', model: flyingSheep, sides: ['N', 'E', 'W'], count: 5, radius: [8, 11], height: [7, 11],
+                  speed: 5, flapRate: 6, flapAmount: 0.55, glide: 0.3, scale: 1.2 }
+            ],
+            backdrop: [
+                { near: 2, far: 12, per100: 14, prop: () => pick([() => cloudTuft(1.4), () => cloudTuft(1.4), () => flowers(SKY_FLOWERS), () => pebbles(MARBLE, 0.4)])() },
+                { near: 10, far: 32, per100: 12, prop: cloudBank, scale: [0.9, 1.4] },
+                { near: 10, far: 30, per100: 4, prop: marbleColumn },
+                { near: 18, far: 40, per100: 3, prop: floatingIsland, scale: [0.9, 1.3] },
+                hillLayer('#c9bfea', [2, 4.5])
+            ],
+            detail: [
+                { count: 60, prop: () => cloudTuft(0.8) },
+                { count: 45, prop: () => flowers(SKY_FLOWERS) },
+                { count: 30, prop: () => pebbles(MARBLE) },
+                { count: 20, prop: feather }
             ]
         },
 

@@ -1118,7 +1118,7 @@ class GameEngine {
             // Speed: world speed x lap/phase scaling, halved while fleeing
             const baseSpeed = snake.userData.speed * speedScale * (isScared ? 0.5 : 1);
 
-            // Biome movement rhythm (weave / slide / pounce / scuttle / swoop / wobble) at about the same average speed
+            // Biome movement rhythm (weave / slide / pounce / scuttle / swoop / wobble / storm) at about the same average speed
             const motion = this.enemyMotion(snake, behaviour, deltaTime, isScared);
             const vel = snake.userData.velocity;
             const side = new THREE.Vector3(-vel.z, 0, vel.x);
@@ -1268,6 +1268,37 @@ class GameEngine {
                     ud.blob.position.y = -0.5 + lift;
                     ud.blob.scale.set(wide * (1 + ripple), stretch, wide * (1 - ripple));
                 }
+                break;
+            }
+
+            case 'storm': { // storm clouds drift 1.6s at 0.8x, puff up 0.4s at 0.3x (the warning), then dash 0.8s at 1.75x (averages 1.0x)
+                const c = t % 2.8;
+                let size = 1, stretch = 1, boltOn = false;
+                if (c < 1.6) {
+                    m.speedFactor = 0.8;
+                    m.roll = Math.sin(t * 1.5) * 0.06;            // drifting lazily
+                } else if (c < 2.0) {
+                    const u = (c - 1.6) / 0.4;                    // 0 to 1 while puffing up
+                    m.speedFactor = 0.3;
+                    size = 1 + 0.2 * Math.sin(u * Math.PI / 2);   // swells up, grumbling
+                    m.roll = Math.sin(t * 40) * 0.06;             // and shakes
+                    boltOn = Math.floor(t * 14) % 2 === 0;        // lightning flickers underneath
+                } else {
+                    const v = (c - 2.0) / 0.8;                    // 0 to 1 through the dash
+                    m.speedFactor = 1.75;
+                    m.pitch = 0.12;                               // leaning into it
+                    size = 1.2 - 0.2 * v;                         // shrinks back as it goes
+                    stretch = 1 + 0.25 * Math.sin(Math.PI * v);   // streaming out behind
+                    boltOn = true;
+                }
+                // Like the seagull, only the model inside bobs and changes shape, so the enemy's
+                // position (and so its collision with Sheepy) is the same as any other enemy's.
+                // Scared clouds keep the rhythm but don't flash lightning.
+                if (ud.cloud) {
+                    ud.cloud.position.y = ud.cloudBaseY + Math.sin(t * 2.2) * 0.15;
+                    ud.cloud.scale.set(size, size * 0.92 + 0.08, size * stretch);
+                }
+                if (ud.bolt) ud.bolt.visible = boltOn && !isScared;
                 break;
             }
         }
