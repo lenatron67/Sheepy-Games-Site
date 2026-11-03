@@ -48,6 +48,7 @@ const Outskirts = (() => {
             prism: new THREE.CylinderGeometry(1, 1, 1, 3),      // barn roof
             octa: new THREE.OctahedronGeometry(1, 0),           // kite
             dome: new THREE.SphereGeometry(1, 10, 4, 0, TAU, 0, Math.PI / 2), // flat base at y = 0
+            donut: new THREE.TorusGeometry(1, 0.45, 8, 16),
             // Low rounded hill: a slice off the top of a sphere, so its edge meets the ground at a
             // gentle slope instead of a wall. Base radius 1 at y = 0, height 1.
             cap: (() => {
@@ -62,7 +63,8 @@ const Outskirts = (() => {
 
     // One part of a prop: shape g (from shapes()), colour c, centre p, size s (a number or [x, y, z])
     // and turn r [x, y, z]. Turns are applied z, then x, then y, so tilts happen in the prop's own
-    // space before it is turned round the vertical.
+    // space before it is turned round the vertical. g can also be a geometry of its own (the candy
+    // shapes from scenery.js); with no colour, a part keeps the colours painted on its geometry.
     const part = (g, c, p, s = 1, r) => ({ g, c, p, s, r });
 
     // A colour a little lighter or darker than c, so repeated props don't all match
@@ -98,7 +100,7 @@ const Outskirts = (() => {
                 const s = Array.isArray(pt.s) ? pt.s : [pt.s, pt.s, pt.s];
                 const local = new THREE.Matrix4().compose(new THREE.Vector3(...pt.p),
                     _q.setFromEuler(_e.set(...(pt.r || [0, 0, 0]), 'YXZ')), new THREE.Vector3(...s));
-                this.pieces.push({ geo: S[pt.g], color: pt.c, matrix: place.clone().multiply(local) });
+                this.pieces.push({ geo: typeof pt.g === 'string' ? S[pt.g] : pt.g, color: pt.c, matrix: place.clone().multiply(local) });
             });
         }
 
@@ -775,9 +777,130 @@ const Outskirts = (() => {
         });
     }
 
+    // The chocolate river past the north fence (Sweetie Valley): glossy chocolate flowing east
+    // between wavy banks, from `near` to `far` past the fence, with a darker edge of melted
+    // chocolate along each bank
+    const RIVER_FLOW = 1.3; // units/sec
+    function chocolateRivers(spec, fence) {
+        const NEAR = fence + spec.near, FAR = fence + spec.far, W = 440, SEG = 110;
+        const tex = sceneryCached('chocolateRiver', () => {
+            const S = 256;
+            const [canvas, ctx] = makeCanvas(S, S);
+            ctx.fillStyle = '#4e240d'; // darker than milk chocolate, as the pink fog lightens it
+            ctx.fillRect(0, 0, S, S);
+            // Streaks along the flow: wavy lighter and darker lines, each a whole number of waves
+            // wide (so the texture tiles), drawn again a tile up and down so none are cut off
+            for (let k = 0; k < 16; k++) {
+                const y0 = Math.random() * S, phase = Math.random() * TAU, waves = 1 + Math.floor(Math.random() * 3);
+                ctx.strokeStyle = k % 3 === 0 ? 'rgba(30, 12, 4, 0.4)' : 'rgba(130, 75, 38, 0.4)';
+                ctx.lineWidth = 2 + Math.random() * 5;
+                for (const dy of [-S, 0, S]) {
+                    ctx.beginPath();
+                    for (let x = 0; x <= S; x += 4) {
+                        const y = y0 + dy + Math.sin(x / S * TAU * waves + phase) * 7;
+                        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                }
+            }
+            ctx.fillStyle = 'rgba(255, 225, 190, 0.45)'; // glossy glints
+            for (let i = 0; i < 90; i++) ctx.fillRect(Math.random() * S, Math.random() * S, 3 + Math.random() * 6, 1.5);
+            const t = new THREE.CanvasTexture(canvas);
+            t.wrapS = t.wrapT = THREE.RepeatWrapping;
+            t.repeat.set(W / 24, (FAR - NEAR) / 24);
+            return t;
+        });
+        const bankTex = sceneryCached('chocolateBank', () => {
+            const [canvas, ctx] = makeCanvas(4, 64);
+            const g = ctx.createLinearGradient(0, 64, 0, 0); // bottom of the canvas = the river side
+            g.addColorStop(0, 'rgba(60, 28, 10, 0.95)');
+            g.addColorStop(0.45, 'rgba(75, 38, 16, 0.6)');
+            g.addColorStop(1, 'rgba(75, 38, 16, 0)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, 4, 64);
+            return new THREE.CanvasTexture(canvas);
+        });
+
+        // Wavy edges, fixed (the chocolate flows along them rather than washing in and out)
+        const nearEdge = x => -NEAR + Math.sin(x * 0.09) * 0.8 + Math.sin(x * 0.23 + 1) * 0.3;
+        const farEdge = x => -FAR + Math.sin(x * 0.07 + 2) * 0.9 + Math.sin(x * 0.19) * 0.35;
+        const geo = new THREE.PlaneGeometry(W, FAR - NEAR, SEG, 2);
+        geo.rotateX(-Math.PI / 2);
+        geo.translate(0, 0.07, -(NEAR + FAR) / 2);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i), z = pos.getZ(i);
+            if (Math.abs(z + NEAR) < 0.01) pos.setZ(i, nearEdge(x));
+            else if (Math.abs(z + FAR) < 0.01) pos.setZ(i, farEdge(x));
+        }
+        geo.computeVertexNormals();
+        const riverMat = new THREE.MeshPhongMaterial({ map: tex, shininess: 55, specular: 0x7a5038 });
+        const river = new THREE.Mesh(geo, riverMat);
+        river.receiveShadow = true;
+
+        // A strip along a bank, from just under the river out onto the ground (outward: +1 = south)
+        const bankGeo = (edge, outward) => {
+            const positions = [], uvs = [], index = [];
+            for (let k = 0; k <= SEG; k++) {
+                const x = -W / 2 + W * k / SEG, z = edge(x);
+                positions.push(x, 0.035, z - outward * 0.5, x, 0.035, z + outward * 1.7);
+                uvs.push(0, 0, 0, 1);
+                if (k > 0) {
+                    const a = (k - 1) * 2;
+                    if (outward > 0) index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+                    else index.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+                }
+            }
+            const g = new THREE.BufferGeometry();
+            g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            g.setIndex(index);
+            g.computeVertexNormals();
+            return g;
+        };
+        const bankMat = makeDecalMaterial(bankTex, 'lit');
+        const banks = [bankGeo(nearEdge, 1), bankGeo(farEdge, -1)].map(g => {
+            const m = new THREE.Mesh(g, bankMat);
+            m.receiveShadow = true;
+            return m;
+        });
+
+        const group = new THREE.Group();
+        group.add(river, ...banks);
+        const box = new THREE.Box3(new THREE.Vector3(-W / 2, -1, -(FAR + 3)), new THREE.Vector3(W / 2, 1, -(NEAR - 3)));
+        group.userData.update = (dt, t, camera) => {
+            group.visible = viewOf(camera, t).intersectsBox(box);
+            if (group.visible) tex.offset.x = (-t * RIVER_FLOW / 24) % 1; // flowing east
+        };
+        group.userData.disposables = [geo, riverMat, ...banks.map(b => b.geometry), bankMat];
+        return [group];
+    }
+
+    // Marshmallows and biscuits floating down the chocolate river, bobbing as they go. One that
+    // drifts out of sight comes back in on the far side, also out of sight.
+    function floaters(spec, fence) {
+        const NEAR = fence + spec.near + 1.5, FAR = fence + spec.far - 1.5;
+        return Array.from({ length: spec.count }, (_, i) => {
+            const kind = ['marshmallowWhite', 'marshmallowPink', 'biscuit'][i % 3];
+            const mesh = new THREE.Mesh(sceneryCached('floater-' + kind, () => mergeParts(FLOATERS[kind]())), vertexColourMaterial());
+            mesh.rotation.order = 'YXZ';
+            const z = -rand(NEAR, FAR), speed = RIVER_FLOW * rand(0.8, 1.2), phase = rand(0, TAU), spin = rand(-0.3, 0.3);
+            let x = rand(-100, 100);
+            mesh.userData.update = (dt, t, camera) => {
+                x += speed * dt;
+                if (x > camera.position.x + 110) x -= 220;
+                if (x < camera.position.x - 110) x += 220;
+                mesh.position.set(x, 0.05 + Math.sin(t * 1.4 + phase) * 0.06, z);
+                mesh.rotation.set(Math.sin(t * 1.1 + phase) * 0.07, phase + t * spin, Math.sin(t * 0.9 + phase) * 0.07);
+            };
+            return mesh;
+        });
+    }
+
     const ANIMAL_KINDS = {
         walker: walkers, hopper: hoppers, flock: flocks, roller: rollers, geyser: geysers, smoker: smokers,
-        sea: seas, sailboat: sailboats, dolphin: dolphins, buoy: buoys, kite: kites
+        sea: seas, sailboat: sailboats, dolphin: dolphins, buoy: buoys, kite: kites,
+        chocolateRiver: chocolateRivers, floater: floaters
     };
 
     // ---------- Shared props ----------
@@ -1317,6 +1440,141 @@ const Outskirts = (() => {
         ...[-1.6, -2.1, -2.6, -3.1].map((y, i) => part('box', i % 2 ? '#ffffff' : colour, [0, y, 0], [0.32, 0.12, 0.04]))
     ];
 
+    // ---------- Sweetie Valley ----------
+    // Inside the fence, nothing here is shaped or coloured like a jelly bean, a jelly blob or a
+    // cupcake: the detail is mint grass, white meringues, chocolate chips and flat peppermints.
+
+    const SWEET_COLOURS = ['#ff4f9a', '#ffd93a', '#35b8ff', '#6fd13a', '#a35cff', '#ff8a1f'];
+    const LOLLY_PAIRS = [['#ffffff', '#ff4f9a'], ['#ffd93a', '#ff8a1f'], ['#ffffff', '#2fbfa8'], ['#ffffff', '#a35cff'], ['#ff9ac8', '#ffffff']];
+    const CANE_COLOURS = [['#ffffff', '#e5283a'], ['#ffffff', '#2fae4a'], ['#ffffff', '#ff7ab8']];
+    const STICK = '#fdf8f2';
+
+    // A giant lollipop on a stick: mostly swirls facing the camera, some round
+    const bigLollipop = () => {
+        const h = rand(3, 5);
+        const stick = part('cyl', STICK, [0, h / 2, 0], [0.16, h, 0.16]);
+        if (Math.random() < 0.3) {
+            const r = rand(0.9, 1.3);
+            return [stick, part(sceneryCached('smoothBall', () => new THREE.SphereGeometry(1, 12, 8)), vary(pick(SWEET_COLOURS), 0.04), [0, h + r * 0.9, 0], r)];
+        }
+        const r = rand(1.3, 1.9), [a, b] = pick(LOLLY_PAIRS);
+        return [stick, part(lollipopSwirlGeo(1, a, b), undefined, [0, h + r * 0.95, 0], r, [-0.2, 0, 0])];
+    };
+
+    const bigCane = () => [part(candyCaneGeo(5, 0.3, pick(CANE_COLOURS)), undefined, [-0.45, 0, 0])];
+
+    // Wrapped sweet lying on the grass, its wrapper twisted at both ends
+    const wrappedSweet = () => {
+        const c = pick(SWEET_COLOURS), s = rand(0.35, 0.5);
+        return [
+            part('ball', c, [0, s * 0.8, 0], [s * 1.2, s * 0.8, s * 0.8]),
+            part('spike', c, [s * 1.55, s * 0.8, 0], [s * 0.55, s * 0.7, s * 0.55], [0, 0, Math.PI / 2]),
+            part('spike', c, [-s * 1.55, s * 0.8, 0], [s * 0.55, s * 0.7, s * 0.55], [0, 0, -Math.PI / 2])
+        ];
+    };
+
+    // A peppermint lying flat
+    const peppermint = (size = 0.45) => [part(lollipopSwirlGeo(1, '#ffffff', '#e5283a', 2), undefined, [0, 0.07, 0], size, [-Math.PI / 2, 0, 0])];
+
+    const donut = () => [
+        part('donut', '#d9a35c', [0, 0.36, 0], 0.8, [Math.PI / 2, 0, 0]),
+        part('donut', pick(['#ff9ac8', '#6b3a1f', '#fffaf4', '#b8f0d0']), [0, 0.52, 0], [0.84, 0.84, 0.5], [Math.PI / 2, 0, 0])
+    ];
+
+    const gumdrops = () => cluster(randInt(2, 4), 0.55, (x, z) => {
+        const h = rand(0.35, 0.6);
+        return [part('crater', vary(pick(SWEET_COLOURS), 0.03), [x, h / 2, z], [h * 0.8, h, h * 0.8])];
+    });
+
+    const sugarGrass = () => tuft(['#7fd49a', '#93dcaa', '#6cc58a'], randInt(5, 7), 0.5);
+
+    const meringues = () => cluster(randInt(1, 3), 0.4, (x, z) => {
+        const s = rand(0.18, 0.26);
+        return [part('cone', vary(pick(['#fffaf4', '#ffe8f2', '#fff2dc']), 0.02), [x, s * 0.8, z], [s, s * 1.6, s], [0, rand(0, TAU), 0])];
+    });
+
+    const chocChips = () => cluster(randInt(2, 4), 0.4, (x, z) => {
+        const s = rand(0.1, 0.15);
+        return [part('cone', vary('#4a2512', 0.04), [x, s * 0.7, z], [s, s * 1.4, s])];
+    });
+
+    // Low rolling hills in pink, mint and lemon
+    const candyHill = () => hill(pick(['#f6bcd6', '#b5e6c5', '#fbe3ad']), [10, 16], [2, 4.5], [8, 13])();
+
+    // A little gingerbread cottage facing south, with an iced roof. 4.4 wide, 5 high.
+    const cottage = () => {
+        const G = vary('#b8692e', 0.03), ICING = '#fffaf4', ROOF = pick(['#ff9ac8', '#fffaf4', '#8fd0ff']);
+        const parts = [
+            part('box', G, [0, 1.6, 0], [4.4, 3.2, 4.4]),
+            part('prism', G, [0, 3.8, 0], [2.54, 4.4, 1.2], [-Math.PI / 2, 0, 0]),
+            part('box', ROOF, [1.15, 4.2, 0], [3.2, 0.3, 5.0], [0, 0, -0.686]),
+            part('box', ROOF, [-1.15, 4.2, 0], [3.2, 0.3, 5.0], [0, 0, 0.686]),
+            part('box', '#5a3018', [0, 1.1, 2.22], [1.1, 2.2, 0.08]),            // chocolate door
+            part('box', ICING, [0, 2.3, 2.25], [1.4, 0.15, 0.08])
+        ];
+        [-1.4, 1.4].forEach(x => parts.push(
+            part('box', ICING, [x, 1.9, 2.22], [0.95, 0.95, 0.06]),
+            part('box', '#ffe7a3', [x, 1.9, 2.26], [0.7, 0.7, 0.06])
+        ));
+        [[-2.2, 2.2], [2.2, 2.2], [-2.2, -2.2], [2.2, -2.2]].forEach(([x, z]) => parts.push(part('box', ICING, [x, 1.6, z], [0.16, 3.2, 0.16])));
+        for (let k = 0; k < 4; k++) parts.push(part('crater', pick(SWEET_COLOURS), [0, 5.05, -1.5 + k], [0.22, 0.3, 0.22]));
+        return parts;
+    };
+
+    // Gingerbread man, facing +z, about 1.9 tall, arms out
+    const gingerbreadMan = () => {
+        const G = '#b8692e', ICING = '#fffaf4';
+        const body = [
+            part('ball', G, [0, 1.0, 0], [0.42, 0.5, 0.17]),
+            part('ball', G, [-0.22, 0.38, 0], [0.17, 0.4, 0.15], [0, 0, 0.25]),
+            part('ball', G, [0.22, 0.38, 0], [0.17, 0.4, 0.15], [0, 0, -0.25]),
+            part('ball', G, [-0.52, 1.12, 0], [0.38, 0.15, 0.14], [0, 0, 0.45]),
+            part('ball', G, [0.52, 1.12, 0], [0.38, 0.15, 0.14], [0, 0, -0.45]),
+            part('ball', '#e5283a', [0, 1.2, 0.16], 0.07),
+            part('ball', '#3fbf5a', [0, 1.0, 0.17], 0.07),
+            part('ball', '#2f8fe0', [0, 0.8, 0.16], 0.07),
+            part('box', ICING, [-0.8, 1.29, 0.06], [0.04, 0.22, 0.04], [0, 0, 0.45]),   // icing at the wrists and ankles
+            part('box', ICING, [0.8, 1.29, 0.06], [0.04, 0.22, 0.04], [0, 0, -0.45]),
+            part('box', ICING, [-0.3, 0.1, 0.1], [0.22, 0.04, 0.04]),
+            part('box', ICING, [0.3, 0.1, 0.1], [0.22, 0.04, 0.04])
+        ];
+        const head = [
+            part('ball', G, [0, 0.3, 0], [0.34, 0.32, 0.16]),
+            part('ball', ICING, [-0.12, 0.37, 0.13], 0.05),
+            part('ball', ICING, [0.12, 0.37, 0.13], 0.05),
+            part('box', ICING, [0, 0.2, 0.15], [0.18, 0.035, 0.03]),
+            part('ball', '#ff9ab8', [-0.21, 0.25, 0.11], 0.045),
+            part('ball', '#ff9ab8', [0.21, 0.25, 0.11], 0.045)
+        ];
+        return { body, head, neck: [0, 1.45, 0] };
+    };
+
+    // Gummy bear, facing +z, about 1.25 tall; it bounces about as a hopper
+    const gummyBear = c => () => ({ body: [
+        part('ball', c, [0, 0.45, 0], [0.36, 0.42, 0.3]),
+        part('ball', c, [0, 0.98, 0.02], [0.3, 0.28, 0.26]),
+        part('ball', c, [-0.2, 1.2, 0], 0.1),
+        part('ball', c, [0.2, 1.2, 0], 0.1),
+        part('ball', vary(c, 0.1), [0, 0.92, 0.25], [0.13, 0.1, 0.08]),
+        part('ball', '#2a1a1a', [0, 0.96, 0.33], 0.035),
+        part('ball', '#2a1a1a', [-0.11, 1.05, 0.23], 0.03),
+        part('ball', '#2a1a1a', [0.11, 1.05, 0.23], 0.03),
+        part('ball', c, [-0.32, 0.58, 0.12], [0.12, 0.2, 0.12], [0.4, 0, 0.3]),
+        part('ball', c, [0.32, 0.58, 0.12], [0.12, 0.2, 0.12], [0.4, 0, -0.3]),
+        part('ball', c, [-0.18, 0.1, 0.12], [0.15, 0.12, 0.2]),
+        part('ball', c, [0.18, 0.1, 0.12], [0.15, 0.12, 0.2])
+    ]});
+
+    // Things floating down the chocolate river
+    const FLOATERS = {
+        marshmallowWhite: () => [part('cyl', '#fffaf4', [0, 0.2, 0], [0.55, 0.7, 0.55])],
+        marshmallowPink: () => [part('cyl', '#ffc4dc', [0, 0.2, 0], [0.55, 0.7, 0.55])],
+        biscuit: () => [
+            part('cyl', '#c98a4a', [0, 0.05, 0], [0.85, 0.18, 0.85]),
+            ...[[0.3, 0.2], [-0.35, 0.1], [0.05, -0.4], [-0.1, 0.45], [0.45, -0.25]].map(([x, z]) => part('pebble', '#4a2512', [x, 0.16, z], 0.09))
+        ]
+    };
+
     // ---------- The sets, named by `outskirts` in levels.js ----------
     // Backdrop distances are past the fence. The camera sees about 30-50 units past the east and
     // west fences, and 25-40 past the north one (fog hides the rest), so that's where things go.
@@ -1430,6 +1688,38 @@ const Outskirts = (() => {
                 { count: 25, prop: () => mushrooms(['#9a5a3a', '#b07a4a', '#7a4fa0']) },
                 { count: 30, prop: mossyRock },
                 { count: 20, prop: root }
+            ]
+        },
+
+        sweetie: {
+            // The chocolate river runs 15 to 27 past the north fence, so the north side's backdrop
+            // goes either side of it: small sweets on the near bank, lollipops and hills beyond
+            animals: [
+                { kind: 'chocolateRiver', near: 15, far: 27 },
+                { kind: 'floater', count: 9, near: 15, far: 27 },
+                { kind: 'walker', name: 'gingerbreadMan', model: gingerbreadMan, sides: ['N', 'E', 'W', 'W'], speed: 1.0, stride: 3.0, bob: 0.1, graze: 0.25, look: 0.6, scale: 1.3 },
+                { kind: 'hopper', name: 'gummyRed', model: gummyBear('#e8333f'), sides: ['E'], hop: 0.8, hopHeight: 0.45, hopTime: 0.33, scale: 1.3 },
+                { kind: 'hopper', name: 'gummyGreen', model: gummyBear('#5cc84a'), sides: ['W'], hop: 0.8, hopHeight: 0.45, hopTime: 0.33, scale: 1.3 },
+                { kind: 'hopper', name: 'gummyYellow', model: gummyBear('#ffc93a'), sides: ['E', 'W'], hop: 0.8, hopHeight: 0.45, hopTime: 0.33, scale: 1.3 },
+                { kind: 'flock', name: 'sugarbird', model: bird({ body: '#ffffff', head: '#ffffff', wing: '#f0f0f0', tip: '#d6d6d6', beak: '#ffb030' }),
+                  sides: ['N', 'E', 'W'], count: 6, radius: [7, 10], height: [5, 9], speed: 7, flapRate: 10, flapAmount: 0.7, glide: 0.3,
+                  tints: ['#ff9ccf', '#9fd8ff', '#c8a8ff', '#fff07a', '#a8f0c0'] }
+            ],
+            backdrop: [
+                { count: 2, sides: ['E', 'W'], near: 13, far: 17, prop: cottage, turn: [-0.25, 0.25], clear: 5 },
+                { near: 2, far: 12, per100: 14, prop: () => pick([wrappedSweet, () => peppermint(rand(0.5, 0.8)), donut, gumdrops, sugarGrass, sugarGrass])() },
+                { near: 12, far: 32, sides: ['E', 'W'], per100: 16, prop: bigLollipop, turn: [-0.5, 0.5], scale: [1, 1.5] },
+                { near: 12, far: 32, sides: ['E', 'W'], per100: 6, prop: bigCane, scale: [1, 1.4] },
+                { near: 30, far: 42, sides: ['N'], per100: 14, prop: bigLollipop, turn: [-0.5, 0.5], scale: [1.1, 1.6] },
+                { near: 30, far: 42, sides: ['N'], per100: 5, prop: bigCane, scale: [1.1, 1.5] },
+                { near: 30, far: 54, per100: 7, sides: ['E', 'W'], prop: candyHill },
+                { near: 46, far: 62, per100: 7, sides: ['N'], prop: candyHill }
+            ],
+            detail: [
+                { count: 70, prop: sugarGrass },
+                { count: 30, prop: meringues },
+                { count: 30, prop: chocChips },
+                { count: 15, prop: () => peppermint(rand(0.3, 0.4)) }
             ]
         },
 

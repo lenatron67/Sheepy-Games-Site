@@ -1,4 +1,4 @@
-const LEVEL_ORDER = ['MAIN', 'BEACH', 'DESERT', 'SNOW', 'JUNGLE', 'VOLCANO'];
+const LEVEL_ORDER = ['MAIN', 'BEACH', 'DESERT', 'SNOW', 'JUNGLE', 'SWEETIE', 'VOLCANO'];
 
 // Enemy difficulty scaling on top of each world's enemySpeed:
 //   +10% for every lap of all the worlds (lap 2 = +10%, lap 3 = +20%, ...)
@@ -35,6 +35,7 @@ const ENEMY_SCALING = {
 //     weave   - slithers side to side          slide  - waddles, then belly-slides in fast bursts
 //     pounce  - stalks slowly, pounces when close     scuttle - moves sideways in quick pulses
 //     swoop   - waddles, then spreads its wings and swoops fast (the model needs userData.bird and wings)
+//     wobble  - hops along in squashy bounces, wobbling as it lands (the model needs userData.blob)
 const LEVELS = {
     MAIN: {
         // Theme metadata
@@ -301,6 +302,62 @@ const LEVELS = {
         PINK_COINS_COUNT: 20,
         GOLD_COINS_COUNT: 10,
         TREES_COUNT: 60,
+        WORLD_SIZE: 160,
+        SMALL_WORLD_SIZE: 80,
+        GROUND_SIZE: 400, // well past the fence, so the ground fades into the fog instead of ending
+        COIN_SPAWN_HEIGHT: 1,
+        GOLD_COIN_SPAWN_HEIGHT: 6,
+        TREE_EXCLUSION_ZONE: 5
+    },
+
+    SWEETIE: {
+        // Theme metadata
+        biomeName: 'Sweetie Valley',
+        icon: '🍭',
+        mapColor: '#f48fc0',
+        skyColor: 0xf7cfe4,
+        groundType: 'generateSweetieTexture',
+        primaryCoinModel: 'createJellyBean',
+        primaryCoinName: 'Jelly Beans',
+        primaryCoinLabel: 'Beans: ',
+        primaryCoinColor: '#ff5fa2',
+        goldCoinModel: 'createChocolateCoin',
+        goldCoinName: 'Chocolate Coins',
+        goldCoinColor: '#FFD700',
+        obstacleModel: 'createSweetieObstacle',
+        bonusItemModel: 'createCupcake',
+        hasEnemies: true,
+        enemyModel: 'createJellyBlob',
+        enemyTypes: ['BLINKY', 'BLINKY', 'PINKY', 'PINKY', 'INKY', 'INKY', 'CLYDE', 'CLYDE', 'BLINKY'],
+        // Jelly flavours: strawberry, cherry, bubblegum, raspberry, blue raspberry, ice blue, orange, tangerine, red apple
+        enemyColors: [0xff3355, 0xff5566, 0xff77cc, 0xff99dd, 0x2aa8ff, 0x55ccff, 0xff9922, 0xffb844, 0xee2244],
+        enemySpeed: 6.83,
+        enemyBehaviour: 'wobble',
+        atmosphere: {
+            ambientColor: 0xfff0f8, ambientIntensity: 0.58,
+            sunColor: 0xfff8f0, sunIntensity: 0.8,
+            fogNear: 25, fogFar: 70
+        },
+        ambientEffect: { // sugar sparkles drifting down
+            count: 150, color: 0xffe0f0, size: 0.3, opacity: 0.9,
+            heightMin: 0.5, heightMax: 8, velocity: [0.3, -0.35, 0.2], sway: 0.7, twinkle: true, additive: true
+        },
+        // A gingerbread house on the north edge with a biscuit path from its door, and a gumball
+        // machine on the east edge. A chocolate river runs past the north fence (see outskirts.js).
+        landmarks: [
+            { model: 'createGingerbreadHouse', x: 0, z: -49, halfSize: 4.8 },
+            { model: 'createGumballMachine', x: 47, z: 2, radius: 2.7 }
+        ],
+        groundDetail: 'createBiscuitPath',
+        outskirts: 'sweetie',
+        music: { // a music-box tune in D
+            melody: 'D5 - F#5 A5 - F#5 D5 - E5 - G5 B5 - G5 E5 - F#5 A5 D6 A5 F#5 D5 A4 - B4 C#5 D5 E5 F#5 E5 D5 -',
+            bass: ['D3', 'E3', 'D3', 'A2'], tempo: 0.13, wave: 'sine', gain: 0.12, drums: 'standard'
+        },
+        // World config
+        PINK_COINS_COUNT: 20,
+        GOLD_COINS_COUNT: 10,
+        TREES_COUNT: 55,
         WORLD_SIZE: 160,
         SMALL_WORLD_SIZE: 80,
         GROUND_SIZE: 400, // well past the fence, so the ground fades into the fog instead of ending

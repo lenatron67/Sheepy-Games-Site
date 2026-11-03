@@ -158,7 +158,8 @@ function makeCanvas(width, height) {
 // Many simple shapes merged into one mesh, each with its own colour, so a whole landmark costs
 // one draw call. Texture coordinates are kept too, for textured merges.
 // pieces: [{ geo, color, pos: [x,y,z], rot: [x,y,z], scale: [x,y,z] }], or { geo, color, matrix }
-// with a ready-made Matrix4 instead of pos/rot/scale
+// with a ready-made Matrix4 instead of pos/rot/scale. A piece with no color keeps the colours its
+// geometry already has (stripes painted on per vertex, like the candy canes).
 function mergePieces(pieces) {
     const positions = [], normals = [], colors = [], uvs = [], indices = [];
     const m = new THREE.Matrix4(), nm = new THREE.Matrix3();
@@ -170,14 +171,16 @@ function mergePieces(pieces) {
                        q.setFromEuler(e.set(...(p.rot || [0, 0, 0]))),
                        new THREE.Vector3(...(p.scale || [1, 1, 1])));
         nm.getNormalMatrix(m);
-        col.set(p.color);
+        const own = p.color === undefined ? p.geo.attributes.color : null;
+        if (!own) col.set(p.color);
         const pos = p.geo.attributes.position, nor = p.geo.attributes.normal, uv = p.geo.attributes.uv;
         for (let i = 0; i < pos.count; i++) {
             v.fromBufferAttribute(pos, i).applyMatrix4(m);
             positions.push(v.x, v.y, v.z);
             v.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize();
             normals.push(v.x, v.y, v.z);
-            colors.push(col.r, col.g, col.b);
+            if (own) colors.push(own.getX(i), own.getY(i), own.getZ(i));
+            else colors.push(col.r, col.g, col.b);
             if (uv) uvs.push(uv.getX(i), uv.getY(i)); else uvs.push(0, 0);
         }
         if (p.geo.index) {
@@ -201,6 +204,69 @@ function vertexColourMaterial() {
     return sceneryCached('vertexColourMat', () => new THREE.MeshStandardMaterial({
         vertexColors: true, flatShading: true, roughness: 0.9, metalness: 0
     }));
+}
+
+// ---------- Sweetie Valley candy shapes (used by the obstacles, the gingerbread house and the outskirts) ----------
+
+// A tube along `curve` with candy stripes winding round it: each stripe is `stripe` long, and the
+// colours take turns. Coloured per triangle so the stripes stay crisp; use as a mergePieces piece
+// with no color.
+function candyStripeTube(curve, radius, colours, { stripe = 0.3, tubular = 32, radial = 6 } = {}) {
+    const geo = new THREE.TubeGeometry(curve, tubular, radius, radial, false).toNonIndexed();
+    const uv = geo.attributes.uv, n = geo.attributes.position.count;
+    const length = curve.getLength(), cols = colours.map(c => new THREE.Color(c)), k = cols.length;
+    const out = new Float32Array(n * 3);
+    for (let i = 0; i < n; i += 3) {
+        const along = (uv.getX(i) + uv.getX(i + 1) + uv.getX(i + 2)) / 3; // 0 to 1 along the tube
+        const round = (uv.getY(i) + uv.getY(i + 1) + uv.getY(i + 2)) / 3; // 0 to 1 round it
+        // Going once round the tube moves k stripes on, so the stripes wind round and meet up at the seam
+        const s = ((Math.floor(along * length / stripe + round * k) % k) + k) % k;
+        for (let j = 0; j < 3; j++) cols[s].toArray(out, (i + j) * 3);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(out, 3));
+    return geo;
+}
+
+// A candy cane standing up, `height` tall, its hook curling over towards +x
+function candyCaneGeo(height, radius, colours = ['#ffffff', '#e5283a']) {
+    return sceneryCached(`candyCane${height},${radius},${colours}`, () => {
+        const hook = radius * 3; // radius of the curl
+        const pts = [];
+        for (let i = 0; i <= 6; i++) pts.push(new THREE.Vector3(0, (height - hook) * i / 6, 0));
+        for (let i = 1; i <= 10; i++) { // half a circle over the top, ending a little way down
+            const a = Math.PI * i / 10;
+            pts.push(new THREE.Vector3(hook - Math.cos(a) * hook, height - hook + Math.sin(a) * hook, 0));
+        }
+        pts.push(new THREE.Vector3(hook * 2, height - hook * 1.6, 0));
+        const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+        return candyStripeTube(curve, radius, colours, { stripe: radius * 1.8, tubular: 40, radial: 6 });
+    });
+}
+
+// A swirl lollipop's disc, facing +z, `radius` across: a disc of colour a with a spiral of colour b
+// standing out on both faces
+function lollipopSwirlGeo(radius, a, b, turns = 3.5) {
+    return sceneryCached(`lollipopSwirl${radius},${a},${b},${turns}`, () => {
+        const sweep = turns * Math.PI * 2;
+        const step = radius / (sweep + Math.PI);    // how far out the spiral moves per radian
+        const tube = step * Math.PI / 2;            // spiral as wide as the gaps between its turns
+        const pts = [];
+        const n = Math.ceil(turns * 14);
+        for (let i = 0; i <= n; i++) {
+            const t = sweep * i / n, r = step * (t + Math.PI * 0.5);
+            pts.push(new THREE.Vector3(Math.cos(t) * r, Math.sin(t) * r, 0));
+        }
+        const spiral = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n, tube, 3, false);
+        return mergePieces([
+            { geo: new THREE.CylinderGeometry(radius, radius, tube * 1.4, 18), color: a, rot: [Math.PI / 2, 0, 0] },
+            { geo: spiral, color: b }
+        ]);
+    });
+}
+
+// Glossy material for sweets merged with vertex colours (smooth, unlike the flat-shaded landmarks)
+function candyMaterial() {
+    return sceneryCached('candyMat', () => new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 70, specular: 0x555555 }));
 }
 
 // A flat strip along a curve through `points` (on the ground), `width` wide. The texture repeats
@@ -1212,6 +1278,190 @@ const SceneryModels = {
         mesh.castShadow = true;
         const group = new THREE.Group();
         group.add(mesh);
+        return group;
+    },
+
+    // Sweetie Valley landmark: a gingerbread house with an iced roof covered in sweets, its door
+    // facing south between two candy canes. 9 units across, 8 high. Solid square in levels.js.
+    createGingerbreadHouse() {
+        const parts = sceneryCached('gingerbreadHouse', () => {
+            const GINGER = '#b8692e', DARK_GINGER = '#8f4e22', ICING = '#fffaf4', CHOC = '#5a3018';
+            const CANDY = ['#e5283a', '#ffd23a', '#3fbf5a', '#2f8fe0', '#ff7ac0', '#ff9a2a'];
+            const W = 4, D = 4, EAVE = 4.2, RIDGE = 7.0; // half width, half depth, wall and ridge heights
+            const B = new THREE.BoxGeometry(1, 1, 1);
+            const BALL = new THREE.SphereGeometry(1, 6, 4);
+            const DROP = new THREE.SphereGeometry(1, 6, 3, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2); // bottom half of a ball
+            const box = (color, s, p, r) => ({ geo: B, color, scale: s, pos: p, rot: r });
+            const pieces = [];
+
+            // Cake board under it, then the walls and gables as one five-sided shape, front to back
+            pieces.push(box(ICING, [W * 2 + 0.8, 0.3, D * 2 + 0.8], [0, 0.15, 0]));
+            const outline = new THREE.Shape();
+            outline.moveTo(-W, 0); outline.lineTo(W, 0); outline.lineTo(W, EAVE); outline.lineTo(0, RIDGE); outline.lineTo(-W, EAVE); outline.closePath();
+            const walls = new THREE.ExtrudeGeometry(outline, { depth: D * 2, bevelEnabled: false });
+            walls.translate(0, 0.3, -D);
+            pieces.push({ geo: walls, color: GINGER });
+
+            // Roof: two iced slabs from the ridge out past the walls, with rows of candy buttons
+            const slope = Math.atan2(RIDGE - EAVE, W), run = Math.hypot(W, RIDGE - EAVE) + 0.7, THICK = 0.4;
+            const slabAt = side => new THREE.Matrix4().compose(
+                new THREE.Vector3(side * (run / 2) * Math.cos(slope), 0.3 + RIDGE - (run / 2) * Math.sin(slope), 0),
+                new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -side * slope)),
+                new THREE.Vector3(1, 1, 1));
+            const onSlab = (side, along, z, up, geo, color, scale) => {
+                // along: 0 at the ridge to 1 at the eave; up: height above the slab's middle
+                const m = slabAt(side).multiply(new THREE.Matrix4().compose(
+                    new THREE.Vector3(side * (along - 0.5) * run, up, z), new THREE.Quaternion(), new THREE.Vector3(...scale)));
+                pieces.push({ geo, color, matrix: m });
+            };
+            [-1, 1].forEach(side => {
+                onSlab(side, 0.5, 0, 0, B, ICING, [run, THICK, D * 2 + 1.2]);
+                [0.3, 0.55, 0.8].forEach((along, row) => {
+                    for (let k = 0; k < 7; k++) {
+                        onSlab(side, along, -3.6 + k * 1.2 + (row % 2) * 0.6, THICK / 2, BALL, CANDY[(k + row * 2 + (side > 0 ? 3 : 0)) % CANDY.length], [0.26, 0.12, 0.26]);
+                    }
+                });
+                // Icing drips along the eave
+                for (let k = 0; k < 13; k++) onSlab(side, 1.0, -4.5 + k * 0.75, -THICK / 2, DROP, ICING, [0.24, 0.3, 0.24]);
+            });
+            // Gumdrops along the ridge
+            const GUMDROP = new THREE.CylinderGeometry(0.22, 0.38, 0.5, 7);
+            for (let k = 0; k < 8; k++) pieces.push({ geo: GUMDROP, color: CANDY[k % CANDY.length], pos: [0, 0.3 + RIDGE + 0.42, -3.85 + k * 1.1] });
+            // Chimney with icing on top
+            pieces.push(box(DARK_GINGER, [1.0, 2.0, 1.0], [-2.0, 0.3 + 6.4, -1.6]));
+            pieces.push(box(ICING, [1.25, 0.3, 1.25], [-2.0, 0.3 + 7.5, -1.6]));
+
+            // Front (z = +D): chocolate door in an icing frame, two lit windows, a peppermint in the gable
+            const FRONT = D + 0.06;
+            pieces.push(box(CHOC, [1.5, 2.5, 0.12], [0, 0.3 + 1.25, FRONT]));
+            pieces.push(box(ICING, [0.16, 2.7, 0.16], [-0.83, 0.3 + 1.3, FRONT + 0.04]));
+            pieces.push(box(ICING, [0.16, 2.7, 0.16], [0.83, 0.3 + 1.3, FRONT + 0.04]));
+            pieces.push(box(ICING, [1.8, 0.18, 0.16], [0, 0.3 + 2.6, FRONT + 0.04]));
+            pieces.push({ geo: BALL, color: '#ffd23a', scale: [0.11, 0.11, 0.11], pos: [0.45, 0.3 + 1.2, FRONT + 0.1] });
+            const addWindow = (x, y, z, turn) => {
+                const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, turn, 0)), new THREE.Vector3(1, 1, 1));
+                const add = (color, s, p) => pieces.push({ geo: B, color, matrix: m.clone().multiply(new THREE.Matrix4().compose(new THREE.Vector3(...p), new THREE.Quaternion(), new THREE.Vector3(...s))) });
+                add('#ffe7a3', [1.1, 1.1, 0.1], [0, 0, 0]);       // warm light inside
+                add(ICING, [1.4, 0.16, 0.16], [0, 0.62, 0.05]);   // frame
+                add(ICING, [1.4, 0.16, 0.16], [0, -0.62, 0.05]);
+                add(ICING, [0.16, 1.4, 0.16], [-0.62, 0, 0.05]);
+                add(ICING, [0.16, 1.4, 0.16], [0.62, 0, 0.05]);
+                add(ICING, [0.1, 1.1, 0.1], [0, 0, 0.06]);        // cross bars
+                add(ICING, [1.1, 0.1, 0.1], [0, 0, 0.06]);
+            };
+            addWindow(-2.4, 0.3 + 2.3, FRONT, 0);
+            addWindow(2.4, 0.3 + 2.3, FRONT, 0);
+            addWindow(W + 0.06, 0.3 + 2.3, 0, Math.PI / 2);
+            addWindow(-W - 0.06, 0.3 + 2.3, 0, -Math.PI / 2);
+            pieces.push({ geo: lollipopSwirlGeo(0.75, '#ffffff', '#e5283a', 2.5), pos: [0, 0.3 + 5.25, FRONT + 0.05] });
+            // Icing piped along the front and back gables, and down the corners
+            [FRONT, -FRONT].forEach(z => {
+                for (let k = 0; k <= 7; k++) {
+                    const t = k / 7;
+                    [-1, 1].forEach(side => pieces.push({ geo: BALL, color: ICING, scale: [0.2, 0.2, 0.2], pos: [side * W * (1 - t), 0.3 + EAVE + (RIDGE - EAVE) * t, z] }));
+                }
+            });
+            [[-W, D], [W, D], [-W, -D], [W, -D]].forEach(([x, z]) => pieces.push(box(ICING, [0.22, EAVE, 0.22], [x, 0.3 + EAVE / 2, z])));
+            // Candy canes either side of the door, curling outwards
+            pieces.push({ geo: candyCaneGeo(2.8, 0.15), pos: [1.45, 0.3, D + 0.5] });
+            pieces.push({ geo: candyCaneGeo(2.8, 0.15), pos: [-1.45, 0.3, D + 0.5], rot: [0, Math.PI, 0] });
+            return mergePieces(pieces);
+        });
+
+        const mesh = new THREE.Mesh(parts, vertexColourMaterial());
+        mesh.castShadow = true;
+        const group = new THREE.Group();
+        group.add(mesh);
+        return group;
+    },
+
+    // Sweetie Valley ground detail: a path of square biscuits from the gingerbread house door
+    // towards the middle
+    createBiscuitPath(level, solids) {
+        const texture = sceneryCached('biscuitPathTex', () => {
+            const W = 128, H = 256;
+            const [canvas, ctx] = makeCanvas(W, H);
+            for (let k = 0; k < 2; k++) { // two biscuits per tile, so they come out square
+                const y0 = k * H / 2;
+                const n = Math.floor(Math.random() * 16);
+                roundRectPath(ctx, 6, y0 + 6, W - 12, H / 2 - 12, 10);
+                ctx.fillStyle = `rgb(${214 + n}, ${160 + n}, ${92 + n})`;
+                ctx.fill();
+                ctx.lineWidth = 5;
+                ctx.strokeStyle = 'rgba(150, 95, 40, 0.8)'; // darker baked edge
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(130, 80, 35, 0.75)'; // docking holes in neat rows
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 0; c < 4; c++) {
+                        ctx.beginPath();
+                        ctx.arc(26 + c * 25, y0 + 26 + r * 25, 3.2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                for (let i = 0; i < 40; i++) { // sugar crystals on top
+                    ctx.fillStyle = 'rgba(255, 250, 235, 0.8)';
+                    ctx.fillRect(14 + Math.random() * (W - 28), y0 + 14 + Math.random() * (H / 2 - 28), 2, 2);
+                }
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        });
+        return pathFromLandmark(level, texture, 3.0, 0.02);
+    },
+
+    // Sweetie Valley second landmark: a giant gumball machine, a glass globe full of gumballs on a
+    // red stand. 11 high; solid radius in levels.js.
+    createGumballMachine() {
+        const parts = sceneryCached('gumballMachine', () => {
+            const RED = '#e0262f', DARK_RED = '#b81d25', SILVER = '#d4d8de', SLOT = '#3a3a40';
+            const GLOBE_Y = 7.0, GLOBE_R = 2.6;
+            const stand = mergePieces([
+                { geo: new THREE.CylinderGeometry(2.0, 2.3, 0.5, 20), color: DARK_RED, pos: [0, 0.25, 0] },
+                { geo: new THREE.CylinderGeometry(1.0, 1.45, 2.3, 18), color: RED, pos: [0, 1.65, 0] },
+                { geo: new THREE.CylinderGeometry(1.75, 1.6, 1.9, 20), color: RED, pos: [0, 3.75, 0] },
+                { geo: new THREE.TorusGeometry(1.75, 0.13, 6, 28), color: SILVER, pos: [0, 4.7, 0], rot: [Math.PI / 2, 0, 0] },
+                { geo: new THREE.CylinderGeometry(1.9, 1.75, 0.5, 20), color: RED, pos: [0, 4.95, 0] },
+                // Coin dial with its handle, and the chute below, facing the camera
+                { geo: new THREE.CylinderGeometry(0.62, 0.62, 0.16, 18), color: SILVER, pos: [0, 4.0, 1.68], rot: [Math.PI / 2, 0, 0] },
+                { geo: new THREE.BoxGeometry(1.0, 0.22, 0.2), color: SILVER, pos: [0, 4.0, 1.8] },
+                { geo: new THREE.BoxGeometry(0.12, 0.42, 0.06), color: SLOT, pos: [0, 4.0, 1.91] },
+                { geo: new THREE.BoxGeometry(0.9, 0.7, 0.45), color: SILVER, pos: [0, 3.05, 1.65] },
+                { geo: new THREE.BoxGeometry(0.62, 0.42, 0.1), color: SLOT, pos: [0, 3.05, 1.9] },
+                // Lid with a knob on top of the globe
+                { geo: new THREE.SphereGeometry(1.35, 28, 10, 0, Math.PI * 2, 0, Math.PI / 2), color: RED, pos: [0, GLOBE_Y + GLOBE_R - 0.35, 0] },
+                { geo: new THREE.CylinderGeometry(1.4, 1.4, 0.25, 18), color: DARK_RED, pos: [0, GLOBE_Y + GLOBE_R - 0.4, 0] },
+                { geo: new THREE.SphereGeometry(0.38, 12, 8), color: RED, pos: [0, GLOBE_Y + GLOBE_R + 1.15, 0] }
+            ]);
+            // Gumballs heaped in the globe, filling it about two thirds of the way up
+            const BALL = new THREE.SphereGeometry(0.46, 8, 6);
+            const COLOURS = ['#e5283a', '#ffd23a', '#3fbf5a', '#2f8fe0', '#ff7ac0', '#ff9a2a', '#9a5ad8', '#ffffff'];
+            const balls = [], spots = [];
+            for (let tries = 0; spots.length < 52 && tries < 3000; tries++) {
+                const p = new THREE.Vector3((Math.random() * 2 - 1) * 2.1, -2.1 + Math.random() * 3.2, (Math.random() * 2 - 1) * 2.1);
+                if (p.length() > GLOBE_R - 0.5 || spots.some(q => q.distanceTo(p) < 0.86)) continue;
+                spots.push(p);
+                balls.push({ geo: BALL, color: COLOURS[spots.length % COLOURS.length], pos: [p.x, GLOBE_Y + p.y, p.z] });
+            }
+            return {
+                stand,
+                balls: mergePieces(balls),
+                globe: new THREE.SphereGeometry(GLOBE_R, 20, 14),
+                globeMat: new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, shininess: 120, specular: 0xffffff, depthWrite: false }),
+                globeY: GLOBE_Y
+            };
+        });
+
+        const group = new THREE.Group();
+        const stand = new THREE.Mesh(parts.stand, vertexColourMaterial());
+        stand.castShadow = true;
+        group.add(stand);
+        const balls = new THREE.Mesh(parts.balls, candyMaterial());
+        balls.castShadow = true;
+        group.add(balls);
+        const globe = new THREE.Mesh(parts.globe, parts.globeMat); // casts no shadow: it's glass
+        globe.position.y = parts.globeY;
+        group.add(globe);
         return group;
     }
 };

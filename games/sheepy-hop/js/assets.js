@@ -254,6 +254,89 @@ const TextureGenerator = {
         texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.set(25, 25);
         return texture;
+    },
+
+    // Sweetie Valley: pale mint frosting with soft swirls piped across it, sugar sparkles and a few
+    // tiny sprinkles (much too small to be taken for the jelly beans you collect)
+    generateSweetieTexture() {
+        const size = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // Darker than it looks in the game: the lights brighten it about 1.2x
+        ctx.fillStyle = '#93c4a2';
+        ctx.fillRect(0, 0, size, size);
+
+        // Drawn again a tile over in each direction, so the texture repeats without seams
+        const wrapped = draw => {
+            for (const dx of [-size, 0, size]) {
+                for (const dy of [-size, 0, size]) {
+                    ctx.save();
+                    ctx.translate(dx, dy);
+                    draw();
+                    ctx.restore();
+                }
+            }
+        };
+
+        // Soft lighter and darker patches, like frosting spread unevenly
+        for (let i = 0; i < 16; i++) {
+            const x = Math.random() * size, y = Math.random() * size, r = 30 + Math.random() * 60;
+            const light = i % 2 === 0;
+            wrapped(() => {
+                const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+                g.addColorStop(0, light ? 'rgba(190, 225, 200, 0.45)' : 'rgba(110, 165, 130, 0.3)');
+                g.addColorStop(1, 'rgba(150, 200, 165, 0)');
+                ctx.fillStyle = g;
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Piped swirls of lighter frosting
+        for (let i = 0; i < 4; i++) {
+            const x = Math.random() * size, y = Math.random() * size, r = 14 + Math.random() * 18;
+            const turn = Math.random() * Math.PI * 2, dir = Math.random() < 0.5 ? 1 : -1;
+            wrapped(() => {
+                ctx.strokeStyle = 'rgba(195, 230, 205, 0.35)';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                for (let t = 0; t <= 1; t += 0.02) {
+                    const a = turn + dir * t * Math.PI * 4, rr = r * t;
+                    const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+                    if (t === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+            });
+        }
+
+        // Sugar sparkles
+        for (let i = 0; i < 2500; i++) {
+            ctx.fillStyle = `rgba(225, 245, 230, ${0.35 + Math.random() * 0.5})`;
+            ctx.fillRect(Math.random() * size, Math.random() * size, 1.5, 1.5);
+        }
+
+        // A few tiny sprinkles
+        const SPRINKLES = ['#d86598', '#d6b33c', '#74aed6', '#a888d6', '#d8e8dc'];
+        for (let i = 0; i < 110; i++) {
+            ctx.save();
+            ctx.translate(Math.random() * size, Math.random() * size);
+            ctx.rotate(Math.random() * Math.PI);
+            ctx.fillStyle = SPRINKLES[i % SPRINKLES.length];
+            ctx.globalAlpha = 0.75;
+            ctx.fillRect(-3, -1, 6, 2);
+            ctx.restore();
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(25, 25);
+        return texture;
     }
 };
 
@@ -417,6 +500,30 @@ const _Geo = {
     gullTail:      new THREE.BoxGeometry(0.35, 0.08, 0.4),
     gullLeg:       new THREE.CylinderGeometry(0.04, 0.04, 0.5, 5),
     gullFoot:      new THREE.BoxGeometry(0.2, 0.04, 0.26),
+    // Sweetie Valley
+    // Jelly bean: a stretched ball, bent so its ends droop like a kidney bean. Lies along x, so it
+    // shows its curve as it spins.
+    jellyBean: (() => {
+        const geo = new THREE.SphereGeometry(1, 12, 8);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i) * 0.72;
+            pos.setXYZ(i, x, pos.getY(i) * 0.36 - 0.24 * (x / 0.72) * (x / 0.72) + 0.1, pos.getZ(i) * 0.36);
+        }
+        geo.computeVertexNormals();
+        return geo;
+    })(),
+    // Jelly blob enemy body: a wobbly dome, rounded at the top and flatter underneath, sitting on y = 0
+    jellyBody: (() => {
+        const geo = new THREE.SphereGeometry(0.9, 16, 12);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const y = pos.getY(i);
+            pos.setY(i, (y < 0 ? y * 0.45 : y * 1.05) + 0.405);
+        }
+        geo.computeVertexNormals();
+        return geo;
+    })(),
 };
 
 // Shared materials — created once at startup, reused by every mesh instance
@@ -497,6 +604,13 @@ const _Mat = {
     gullDark:      new THREE.MeshStandardMaterial({ color: 0x2b2f36, roughness: 0.8 }),
     gullEye:       new THREE.MeshBasicMaterial({ color: 0x111111 }),
     gullLeg:       new THREE.MeshStandardMaterial({ color: 0xf08a24, roughness: 0.6 }),
+    // Sweetie Valley: shiny jelly beans in six flavours, and crinkly gold foil for the chocolate coins
+    jellyBeans: [0xff4f9a, 0xff8a1f, 0xffd93a, 0x6fd13a, 0xa35cff, 0x35b8ff].map(c => new THREE.MeshStandardMaterial({
+        color: c, roughness: 0.22, metalness: 0.05, emissive: new THREE.Color(c).multiplyScalar(0.22)
+    })),
+    chocolateCoin: new THREE.MeshStandardMaterial({ color: 0xFFD24A, metalness: 0.45, roughness: 0.28, emissive: 0x4a3600, flatShading: true }),
+    // The blobs' faces: one material shared by every blob (only the jelly body changes colour)
+    jellyFace:     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35 }),
 };
 
 // 3D Model creation functions
@@ -1386,6 +1500,183 @@ const ModelCreator = {
             tongueMeshNormalColor: 0xffc030,
             bird,
             wings
+        };
+        return group;
+    },
+
+    // ---------- Sweetie Valley ----------
+    // The merged sweets use mergePieces, candyMaterial, candyStripeTube and friends from
+    // scenery.js (loaded by the time levels are built).
+
+    // Jelly bean in a random flavour
+    createJellyBean() {
+        const mats = _Mat.jellyBeans;
+        const bean = new THREE.Mesh(_Geo.jellyBean, mats[Math.floor(Math.random() * mats.length)]);
+        bean.rotation.z = (Math.random() - 0.5) * 0.5; // not all lying quite level
+        bean.castShadow = true;
+        const group = new THREE.Group(); // spins round the vertical, keeping the tilt
+        group.add(bean);
+        return group;
+    },
+
+    // Gold-foil chocolate coin: a raised rim and middle, the foil a little crinkled. Faces the
+    // camera, and shows its edge as it spins.
+    createChocolateCoin() {
+        const geo = sceneryCached('chocolateCoin', () => {
+            const g = mergePieces([
+                { geo: new THREE.CylinderGeometry(0.85, 0.85, 0.16, 28), color: '#ffffff' },
+                { geo: new THREE.TorusGeometry(0.76, 0.07, 6, 28), color: '#ffffff', pos: [0, 0.08, 0], rot: [Math.PI / 2, 0, 0] },
+                { geo: new THREE.TorusGeometry(0.76, 0.07, 6, 28), color: '#ffffff', pos: [0, -0.08, 0], rot: [Math.PI / 2, 0, 0] },
+                { geo: new THREE.CylinderGeometry(0.46, 0.5, 0.24, 20), color: '#ffffff' }
+            ]);
+            g.rotateX(Math.PI / 2);
+            // Crinkle the foil: nudge every point a little (shared points move together, so no gaps)
+            const pos = g.attributes.position;
+            const nudges = new Map();
+            for (let i = 0; i < pos.count; i++) {
+                const key = `${pos.getX(i).toFixed(3)},${pos.getY(i).toFixed(3)},${pos.getZ(i).toFixed(3)}`;
+                if (!nudges.has(key)) nudges.set(key, [(Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.05]);
+                const [dx, dy, dz] = nudges.get(key);
+                pos.setXYZ(i, pos.getX(i) + dx, pos.getY(i) + dy, pos.getZ(i) + dz);
+            }
+            return g;
+        });
+        const coin = new THREE.Mesh(geo, _Mat.chocolateCoin);
+        coin.castShadow = true;
+        return coin;
+    },
+
+    // Cupcake bonus item: a pleated paper case, a swirl of frosting with sprinkles, and a cherry.
+    // One merged mesh, in four frosting and case colours. Centred on its middle, as it tumbles.
+    createCupcake() {
+        const variants = sceneryCached('cupcakes', () => {
+            const SPRINKLES = ['#ff4f9a', '#ffd93a', '#35b8ff', '#6fd13a', '#a35cff', '#ffffff'];
+            const build = (frosting, paper) => {
+                // Pleated case: every other point round the rim pushed out
+                const caseGeo = new THREE.CylinderGeometry(0.56, 0.42, 0.62, 16);
+                const p = caseGeo.attributes.position;
+                for (let i = 0; i < p.count; i++) {
+                    const x = p.getX(i), z = p.getZ(i), r = Math.hypot(x, z);
+                    if (r < 0.3) continue;
+                    if (Math.round((Math.atan2(x, z) + Math.PI) / (Math.PI * 2 / 16)) % 2) { p.setX(i, x * 1.07); p.setZ(i, z * 1.07); }
+                }
+                caseGeo.computeVertexNormals();
+                const pieces = [
+                    { geo: caseGeo, color: paper, pos: [0, -0.3, 0] },
+                    { geo: new THREE.SphereGeometry(0.58, 14, 4, 0, Math.PI * 2, 0, Math.PI / 2), color: '#a0612f', pos: [0, 0.0, 0], scale: [1, 0.35, 1] },
+                    { geo: new THREE.TorusGeometry(0.42, 0.18, 7, 16), color: frosting, pos: [0, 0.12, 0], rot: [Math.PI / 2, 0, 0] },
+                    { geo: new THREE.TorusGeometry(0.29, 0.16, 7, 14), color: frosting, pos: [0, 0.36, 0], rot: [Math.PI / 2, 0, 0.6] },
+                    { geo: new THREE.TorusGeometry(0.15, 0.13, 6, 10), color: frosting, pos: [0, 0.56, 0], rot: [Math.PI / 2, 0, 1.2] },
+                    { geo: new THREE.ConeGeometry(0.13, 0.26, 12), color: frosting, pos: [0, 0.72, 0] },
+                    { geo: new THREE.SphereGeometry(0.14, 8, 6), color: '#e0182d', pos: [0.02, 0.9, 0] },
+                    { geo: new THREE.CylinderGeometry(0.015, 0.015, 0.22, 4), color: '#4a7a2a', pos: [0.07, 1.06, 0], rot: [0, 0, -0.5] }
+                ];
+                const STRIP = new THREE.BoxGeometry(0.04, 0.04, 0.14);
+                for (let k = 0; k < 14; k++) { // sprinkles scattered over the frosting
+                    const a = k * 2.4, ring = k % 3;
+                    const r = [0.58, 0.44, 0.28][ring], y = [0.16, 0.4, 0.6][ring];
+                    pieces.push({ geo: STRIP, color: SPRINKLES[k % SPRINKLES.length], pos: [Math.sin(a) * r, y, Math.cos(a) * r], rot: [k, k * 1.7, 0] });
+                }
+                return mergePieces(pieces);
+            };
+            return [
+                build('#ffb3d1', '#8fd0ff'), build('#fff6ee', '#ff7ab8'),
+                build('#b8f0d0', '#ffd84a'), build('#d9c2ff', '#ffffff')
+            ];
+        });
+        const cake = new THREE.Mesh(variants[Math.floor(Math.random() * variants.length)], candyMaterial());
+        cake.castShadow = true;
+        return cake;
+    },
+
+    // Sweetie Valley obstacle: a swirl lollipop, a lollipop tree or a big candy cane. Each is one
+    // merged mesh (one draw call), and stands within the usual 1.5 collision radius of the
+    // obstacles (the lollipop discs are higher up, above Sheepy and the enemies).
+    createSweetieObstacle() {
+        const variants = sceneryCached('sweetieObstacles', () => {
+            const STICK = '#fdf8f2';
+            const swirl = (a, b, bow) => mergePieces([
+                { geo: new THREE.CylinderGeometry(0.13, 0.15, 3.7, 6, 1, true), color: STICK, pos: [0, 1.85, 0] },
+                { geo: lollipopSwirlGeo(1.45, a, b), pos: [0, 5.0, 0], rot: [-0.25, 0, 0] }, // leaning back a little, towards the camera
+                // A ribbon bow where the stick meets the sweet
+                { geo: new THREE.ConeGeometry(0.22, 0.5, 6), color: bow, pos: [-0.26, 3.62, 0.05], rot: [0, 0, -Math.PI / 2] },
+                { geo: new THREE.ConeGeometry(0.22, 0.5, 6), color: bow, pos: [0.26, 3.62, 0.05], rot: [0, 0, Math.PI / 2] },
+                { geo: new THREE.SphereGeometry(0.12, 6, 4), color: bow, pos: [0, 3.62, 0.08] }
+            ]);
+            const tree = (stripes, balls) => {
+                const trunk = new THREE.LineCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 3.4, 0));
+                const pieces = [{ geo: candyStripeTube(trunk, 0.32, stripes, { stripe: 0.45, tubular: 10, radial: 6 }) }];
+                const BALL = new THREE.SphereGeometry(1, 9, 6);
+                // A round crown of lollipops: a big one on top, four round it
+                [[0, 4.65, 0, 1.0], [-1.05, 3.95, 0.25, 0.72], [1.05, 4.0, 0.2, 0.72], [-0.3, 3.9, -0.95, 0.7], [0.45, 3.85, 0.95, 0.68]]
+                    .forEach(([x, y, z, r], k) => pieces.push({ geo: BALL, color: balls[k % balls.length], pos: [x, y, z], scale: [r, r, r] }));
+                return mergePieces(pieces);
+            };
+            const cane = colours => mergePieces([
+                { geo: candyCaneGeo(5.2, 0.3, colours), pos: [-0.45, 0.1, 0] },
+                { geo: new THREE.SphereGeometry(0.75, 8, 3, 0, Math.PI * 2, 0, Math.PI / 2), color: '#fffaf4', pos: [-0.45, 0, 0], scale: [1, 0.35, 1] } // stuck in a blob of icing
+            ]);
+            return [
+                swirl('#ffffff', '#ff4f9a', '#35b8ff'), swirl('#ffd93a', '#ff8a1f', '#a35cff'), swirl('#ffffff', '#2fbfa8', '#ff4f9a'),
+                tree(['#ffffff', '#ff7ab8'], ['#ff4f9a', '#ffd93a', '#35b8ff', '#6fd13a', '#a35cff']),
+                tree(['#ffffff', '#a35cff'], ['#ff8a1f', '#ff7ab8', '#6fd13a', '#ffd93a', '#35b8ff']),
+                cane(['#ffffff', '#e5283a']), cane(['#ffffff', '#2fae4a'])
+            ];
+        });
+        const k = Math.floor(Math.random() * variants.length);
+        const mesh = new THREE.Mesh(variants[k], candyMaterial());
+        mesh.castShadow = true;
+        // Swirl lollipops face the camera, give or take; trees and canes can face any way
+        mesh.rotation.y = k < 3 ? (Math.random() - 0.5) * 0.9 : Math.random() * Math.PI * 2;
+        const group = new THREE.Group();
+        group.add(mesh);
+        return group;
+    },
+
+    // Jelly blob enemy, facing +z: a wobbly see-through jelly with big eyes and a smile. It hops
+    // along in squashy bounces (see 'wobble' in main.js). It's all in an inner group (userData.blob)
+    // so the hop can lift and squash it without moving the enemy itself, whose collision stays the
+    // same. The jelly's colour shows the AI type, and turns grey when scared. Two draw calls: the
+    // jelly, and the face (shared by every blob).
+    createJellyBlob(colorHex) {
+        const group = new THREE.Group();
+        const blob = new THREE.Group();
+        blob.position.y = -0.5; // enemies are held 0.5 above the ground: this sits the blob on it
+        group.add(blob);
+
+        const jellyMat = new THREE.MeshPhongMaterial({
+            color: colorHex, shininess: 90, specular: 0xffffff, transparent: true, opacity: 0.84
+        });
+        const shape = new THREE.Group(); // the blob's size; the hop squashes and stretches `blob` round it
+        shape.scale.setScalar(1.25);
+        blob.add(shape);
+        const body = new THREE.Mesh(_Geo.jellyBody, jellyMat);
+        body.castShadow = true;
+        shape.add(body);
+
+        const faceGeo = sceneryCached('jellyFace', () => {
+            const BALL = new THREE.SphereGeometry(1, 10, 6);
+            const pieces = [];
+            [-1, 1].forEach(s => {
+                pieces.push({ geo: BALL, color: '#ffffff', pos: [s * 0.3, 0.76, 0.74], scale: [0.23, 0.25, 0.14] });
+                pieces.push({ geo: BALL, color: '#1a1420', pos: [s * 0.28, 0.73, 0.85], scale: [0.12, 0.14, 0.06] });
+                pieces.push({ geo: BALL, color: '#ffffff', pos: [s * 0.28 - 0.04, 0.79, 0.9], scale: [0.04, 0.04, 0.02] });
+            });
+            // Smile, and a glossy highlight up on one side of the jelly
+            pieces.push({ geo: new THREE.TorusGeometry(0.15, 0.035, 4, 8, Math.PI), color: '#6a1830', pos: [0, 0.5, 0.9], rot: [0.15, 0, Math.PI] });
+            pieces.push({ geo: BALL, color: '#ffffff', pos: [-0.42, 1.08, 0.42], scale: [0.11, 0.055, 0.08], rot: [0.5, -0.7, 0.4] });
+            return mergePieces(pieces);
+        });
+        const face = new THREE.Mesh(faceGeo, _Mat.jellyFace);
+        shape.add(face);
+
+        group.userData = {
+            originalColor: colorHex,
+            isScared: false,
+            bodyMesh: body,
+            tongueMesh: face,            // shared face material: it stays white either way
+            tongueMeshNormalColor: 0xffffff,
+            blob
         };
         return group;
     }

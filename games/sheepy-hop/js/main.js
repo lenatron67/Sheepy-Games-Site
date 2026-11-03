@@ -1013,7 +1013,7 @@ class GameEngine {
             // Speed: world speed x lap/phase scaling, halved while fleeing
             const baseSpeed = snake.userData.speed * speedScale * (isScared ? 0.5 : 1);
 
-            // Biome movement rhythm (weave / slide / pounce / scuttle / swoop) at about the same average speed
+            // Biome movement rhythm (weave / slide / pounce / scuttle / swoop / wobble) at about the same average speed
             const motion = this.enemyMotion(snake, behaviour, deltaTime, isScared);
             const vel = snake.userData.velocity;
             const side = new THREE.Vector3(-vel.z, 0, vel.x);
@@ -1136,6 +1136,32 @@ class GameEngine {
                 if (ud.wings) {
                     ud.wings[0].rotation.z = -spread * 1.4;
                     ud.wings[1].rotation.z = spread * 1.4;
+                }
+                break;
+            }
+
+            case 'wobble': { // jelly blobs hop: 0.4s in the air at 1.375x, then 0.2s squashed on the ground at 0.25x (averages 1.0x)
+                const c = t % 0.6;
+                let lift = 0, stretch;
+                if (c < 0.4) {
+                    const s = c / 0.4;                   // 0 to 1 through the hop
+                    m.speedFactor = 1.375;
+                    lift = Math.sin(Math.PI * s) * 1.0;
+                    stretch = 1 + 0.15 * Math.sin(Math.PI * s);  // a little taller in the air
+                } else {
+                    const u = (c - 0.4) / 0.2;           // 0 to 1 while landed
+                    m.speedFactor = 0.25;
+                    stretch = 1 - 0.28 * Math.sin(Math.PI * u);  // squashes flat, then springs up again
+                }
+                // Jelly wobble: the blob leans side to side and its sides ripple, out of step with the hops
+                m.roll = Math.sin(t * 7) * 0.1;
+                const ripple = Math.sin(t * 17) * 0.05;
+                // Like the seagull, only the model inside moves and changes shape, so the enemy's
+                // position (and so its collision with Sheepy) is the same as any other enemy's
+                if (ud.blob) {
+                    const wide = 1 / Math.sqrt(stretch); // keeps its volume as it squashes
+                    ud.blob.position.y = -0.5 + lift;
+                    ud.blob.scale.set(wide * (1 + ripple), stretch, wide * (1 - ripple));
                 }
                 break;
             }
