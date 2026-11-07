@@ -784,8 +784,12 @@ class GameEngine {
                     LEVELS.BONUS.RASPBERRY_FINAL_HEIGHT,
                     r.position.y - LEVELS.BONUS.RASPBERRY_FALL_SPEED * frameScale
                 );
-                r.rotation.x += 0.05 * frameScale;
-                r.rotation.z += 0.05 * frameScale;
+                if (r.userData.spin) {
+                    r.userData.spin(frameScale); // turns its own way as it falls (the shooting star keeps its tail up)
+                } else {
+                    r.rotation.x += 0.05 * frameScale;
+                    r.rotation.z += 0.05 * frameScale;
+                }
             }
 
             if (r.position.distanceTo(this.player.position) < LEVELS.BONUS.RASPBERRY_COLLISION_DISTANCE) {
@@ -1118,7 +1122,7 @@ class GameEngine {
             // Speed: world speed x lap/phase scaling, halved while fleeing
             const baseSpeed = snake.userData.speed * speedScale * (isScared ? 0.5 : 1);
 
-            // Biome movement rhythm (weave / slide / pounce / scuttle / swoop / wobble / storm) at about the same average speed
+            // Biome movement rhythm (weave / slide / pounce / scuttle / swoop / wobble / storm / moonhop) at about the same average speed
             const motion = this.enemyMotion(snake, behaviour, deltaTime, isScared);
             const vel = snake.userData.velocity;
             const side = new THREE.Vector3(-vel.z, 0, vel.x);
@@ -1299,6 +1303,31 @@ class GameEngine {
                     ud.cloud.scale.set(size, size * 0.92 + 0.08, size * stretch);
                 }
                 if (ud.bolt) ud.bolt.visible = boltOn && !isScared;
+                break;
+            }
+
+            case 'moonhop': { // moon aliens crouch 0.25s at 0.4x, then float through a long low-gravity hop 1.0s at 1.15x (averages 1.0x)
+                const c = t % 1.25;
+                let lift = 0, stretch, lean = 0;
+                if (c < 0.25) {
+                    const u = c / 0.25;                                   // 0 to 1 while crouched
+                    m.speedFactor = 0.4;
+                    stretch = 1 - 0.3 * Math.sin(Math.PI * u);            // squashes down, then springs up
+                } else {
+                    const s = (c - 0.25) / 1.0;                           // 0 to 1 through the hop
+                    m.speedFactor = 1.15;
+                    lift = Math.pow(Math.sin(Math.PI * s), 0.6) * 1.4;    // floaty: hangs near the top
+                    stretch = 1 + 0.15 * Math.abs(Math.cos(Math.PI * s)); // a little taller taking off and landing
+                    lean = 0.25 * (2 * s - 1);                            // nose up going up, down coming down
+                }
+                // Like the jelly blob, only the model inside moves and changes shape, so the enemy's
+                // position (and so its collision with Sheepy) is the same as any other enemy's
+                if (ud.alien) {
+                    const wide = 1 / Math.sqrt(stretch); // keeps its volume as it squashes
+                    ud.alien.position.y = -0.5 + lift;
+                    ud.alien.scale.set(wide, stretch, wide);
+                    ud.alien.rotation.x = lean;
+                }
                 break;
             }
         }

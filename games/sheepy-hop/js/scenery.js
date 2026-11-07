@@ -303,6 +303,28 @@ function fluffMaterial() {
     return _Mat.fluff;
 }
 
+// ---------- Moon Base shapes (the moon rocks, the obstacles and the landmarks) ----------
+
+// A knobbly rock: a ball of `radius` with its points pushed in and out by up to `amount` of the
+// radius. detail 0 is rough, 1 is rounder. Points that meet move together, so there are no gaps.
+function lumpyRockGeo(radius, detail, amount) {
+    const geo = new THREE.IcosahedronGeometry(radius, detail);
+    const pos = geo.attributes.position, nudges = new Map();
+    for (let i = 0; i < pos.count; i++) {
+        const key = `${pos.getX(i).toFixed(3)},${pos.getY(i).toFixed(3)},${pos.getZ(i).toFixed(3)}`;
+        if (!nudges.has(key)) nudges.set(key, 1 + (Math.random() * 2 - 1) * amount);
+        const k = nudges.get(key);
+        pos.setXYZ(i, pos.getX(i) * k, pos.getY(i) * k, pos.getZ(i) * k);
+    }
+    geo.computeVertexNormals();
+    return geo;
+}
+
+// Unlit vertex-coloured material, for lights that glow (the UFO's rim lights)
+function glowVertexMaterial() {
+    return sceneryCached('glowVertexMat', () => new THREE.MeshBasicMaterial({ vertexColors: true }));
+}
+
 // A flat strip along a curve through `points` (on the ground), `width` wide. The texture repeats
 // every `texLength` units along it, and the strip narrows to nothing over the last `taper` of
 // its length, so it fades out instead of stopping. One draw call.
@@ -1625,6 +1647,187 @@ const SceneryModels = {
         // Obstacles keep out from under the arch, where they'd poke through the bands
         group.userData.keepClear = [];
         for (let z = -R; z <= R; z += 2) group.userData.keepClear.push({ x: 0, z, r: 3 });
+        return group;
+    },
+
+    // Moon Base landmark: a red and white rocket on its launch pad, with a steel gantry tower
+    // beside it, two fuel tanks and a flag. Vapour puffs from under the engine, and a red light
+    // blinks on top of the tower. 10 across, 12 high. Solid circle in levels.js.
+    createRocket() {
+        const parts = sceneryCached('rocket', () => {
+            const WHITE = '#f2f3f6', RED = '#e53935', STEEL = '#b4b8c2', DARK = '#5a5e68';
+            const B = new THREE.BoxGeometry(1, 1, 1);
+            const box = (color, s, p, r) => ({ geo: B, color, scale: s, pos: p, rot: r });
+            const pieces = [];
+            // The launch pad, with a scorched blast plate in the middle
+            pieces.push({ geo: new THREE.CylinderGeometry(4.6, 5.0, 0.6, 10), color: '#9a9ca4', pos: [0, 0.3, 0] });
+            pieces.push({ geo: new THREE.CylinderGeometry(2.0, 2.0, 0.06, 16), color: '#5e6068', pos: [0, 0.63, 0] });
+            // Engine bell, engine section, then the body: white with red bands, and a red nose cone
+            pieces.push({ geo: new THREE.CylinderGeometry(0.55, 0.95, 0.8, 12), color: DARK, pos: [0, 1.0, 0] });
+            pieces.push({ geo: new THREE.CylinderGeometry(1.05, 1.25, 0.6, 16), color: STEEL, pos: [0, 1.7, 0] });
+            pieces.push({ geo: new THREE.CylinderGeometry(1.25, 1.25, 6.4, 16), color: WHITE, pos: [0, 5.2, 0] });
+            pieces.push({ geo: new THREE.CylinderGeometry(1.28, 1.28, 0.5, 16), color: RED, pos: [0, 2.6, 0] });
+            pieces.push({ geo: new THREE.CylinderGeometry(1.28, 1.28, 0.35, 16), color: RED, pos: [0, 7.9, 0] });
+            pieces.push({ geo: new THREE.ConeGeometry(1.25, 3.0, 16), color: RED, pos: [0, 9.9, 0] });
+            pieces.push({ geo: new THREE.CylinderGeometry(0.06, 0.06, 0.8, 5), color: STEEL, pos: [0, 11.7, 0] });
+            // A porthole, facing the camera
+            pieces.push({ geo: new THREE.CylinderGeometry(0.52, 0.52, 0.1, 16), color: STEEL, pos: [0, 6.2, 1.22], rot: [Math.PI / 2, 0, 0] });
+            pieces.push({ geo: new THREE.CylinderGeometry(0.38, 0.38, 0.1, 16), color: '#5ec8ff', pos: [0, 6.2, 1.28], rot: [Math.PI / 2, 0, 0] });
+            // Four swept fins, on the diagonals so none hides the porthole, standing on the pad
+            const fin = new THREE.Shape();
+            fin.moveTo(0, 0);
+            fin.lineTo(1.5, -1.0);
+            fin.lineTo(1.5, 0.0);
+            fin.lineTo(0, 2.4);
+            fin.closePath();
+            const finGeo = new THREE.ExtrudeGeometry(fin, { depth: 0.18, bevelEnabled: false });
+            finGeo.translate(0, 0, -0.09);
+            for (let k = 0; k < 4; k++) {
+                const a = Math.PI / 4 + k * Math.PI / 2;
+                pieces.push({ geo: finGeo, color: RED, pos: [Math.sin(a) * 1.15, 1.6, Math.cos(a) * 1.15], rot: [0, a - Math.PI / 2, 0] });
+            }
+            // Gantry tower to the west: four posts, a crossbar ring every 1.5 up and a brace across
+            // the front of each section, two arms out to the rocket, and a platform on top
+            const GX = -3.5, GZ = -0.4, GH = 10.5, S = 0.65;
+            [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([sx, sz]) => pieces.push(box(STEEL, [0.16, GH, 0.16], [GX + sx * S, 0.6 + GH / 2, GZ + sz * S])));
+            for (let y = 1.6; y < GH; y += 1.5) {
+                pieces.push(box(STEEL, [2 * S, 0.1, 0.1], [GX, y, GZ + S]), box(STEEL, [2 * S, 0.1, 0.1], [GX, y, GZ - S]),
+                            box(STEEL, [0.1, 0.1, 2 * S], [GX + S, y, GZ]), box(STEEL, [0.1, 0.1, 2 * S], [GX - S, y, GZ]));
+                if (y + 1.5 < GH) pieces.push(box(STEEL, [0.08, 1.98, 0.08], [GX, y + 0.75, GZ + S], [0, 0, 0.71]));
+            }
+            pieces.push(box('#9097a3', [1.7, 0.15, 1.7], [GX, GH + 0.65, GZ]));
+            pieces.push(box(STEEL, [2.2, 0.18, 0.35], [-2.35, 4.6, -0.1]), box(STEEL, [2.2, 0.18, 0.35], [-2.35, 7.6, -0.1]));
+            // Two fuel tanks on the east side, piped to the rocket
+            [[3.0, -1.3], [3.0, 0.9]].forEach(([x, z]) => {
+                pieces.push({ geo: new THREE.SphereGeometry(0.85, 12, 8), color: WHITE, pos: [x, 1.65, z] });
+                pieces.push({ geo: new THREE.CylinderGeometry(0.5, 0.6, 0.5, 8), color: STEEL, pos: [x, 0.85, z] });
+            });
+            pieces.push(box(STEEL, [1.9, 0.14, 0.14], [2.1, 1.25, -0.2]));
+            // A flag at the front of the pad: blue, with a white moon on it
+            pieces.push({ geo: new THREE.CylinderGeometry(0.05, 0.05, 2.6, 5), color: STEEL, pos: [2.6, 1.9, 3.2] });
+            pieces.push(box('#2f6fd6', [1.1, 0.7, 0.04], [3.15, 2.8, 3.2]));
+            pieces.push({ geo: new THREE.CylinderGeometry(0.2, 0.2, 0.06, 12), color: '#ffffff', pos: [3.15, 2.8, 3.21], rot: [Math.PI / 2, 0, 0] });
+            return {
+                rocket: mergePieces(pieces),
+                light: new THREE.SphereGeometry(0.22, 8, 6).translate(GX, GH + 0.95, GZ)
+            };
+        });
+
+        const group = new THREE.Group();
+        const rocket = new THREE.Mesh(parts.rocket, candyMaterial()); // smooth and a little glossy
+        rocket.castShadow = true;
+        group.add(rocket);
+        const light = new THREE.Mesh(parts.light, sceneryCached('beaconMat', () => new THREE.MeshBasicMaterial({ color: 0xff3030 })));
+        group.add(light);
+        const vapour = addSmoke(group, { y: 0.9, count: 4, life: 4.5, rise: 2.2, drift: 2.5, size: 1.4, grow: 3, opacity: 0.45 });
+        vapour.materials.forEach(m => m.color.setHex(0xdde2ea));
+        group.userData.update = (dt, t, camera) => {
+            light.visible = t % 1.2 < 0.5;
+            vapour.update(t, camera);
+        };
+        group.userData.disposables = vapour.materials;
+        return group;
+    },
+
+    // Moon Base ground detail: big shallow craters dotted over the arena, and a moon buggy's tyre
+    // tracks from the launch pad towards the middle
+    createMoonCraters(level, solids) {
+        const craterMat = sceneryCached('moonCraters', () => {
+            const [canvas, ctx] = makeCanvas(512, 512);
+            for (let c = 0; c < 4; c++) {
+                const cx = (c % 2) * 256 + 128, cy = Math.floor(c / 2) * 256 + 128;
+                // On a decal the canvas's top is south, so the sun (south-east) is up and to the right
+                TextureGenerator.drawMoonCrater(ctx, cx, cy, 62 + c * 6, 0.7, -0.7);
+                if (c % 2) TextureGenerator.drawMoonCrater(ctx, cx + 70, cy + 48, 16, 0.7, -0.7); // a little one on the rim
+            }
+            return makeDecalMaterial(new THREE.CanvasTexture(canvas), 'lit');
+        });
+        // All turned the same way, so their shadows match the sun's
+        const craters = litDecalMesh(scatterDecalQuads(level, 24, 5, 11, () => 0), craterMat);
+
+        const trackTex = sceneryCached('tyreTracksTex', () => {
+            const W = 128, H = 256;
+            const [canvas, ctx] = makeCanvas(W, H);
+            // Two tyre tracks: bands of pressed-down dust with chevron treads across them, and a
+            // ridge of lighter dust pushed up along each side
+            [[18, 46], [82, 110]].forEach(([x0, x1]) => {
+                const mid = (x0 + x1) / 2;
+                ctx.fillStyle = 'rgba(72, 72, 82, 0.45)';
+                ctx.fillRect(x0, 0, x1 - x0, H);
+                ctx.fillStyle = 'rgba(48, 48, 58, 0.5)';
+                for (let y = 0; y < H; y += 16) {
+                    ctx.beginPath();
+                    ctx.moveTo(x0, y);
+                    ctx.lineTo(mid, y + 6);
+                    ctx.lineTo(x1, y);
+                    ctx.lineTo(x1, y + 5);
+                    ctx.lineTo(mid, y + 11);
+                    ctx.lineTo(x0, y + 5);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.fillStyle = 'rgba(205, 205, 214, 0.35)';
+                ctx.fillRect(x0 - 5, 0, 5, H);
+                ctx.fillRect(x1, 0, 5, H);
+            });
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        });
+        const tracks = pathFromLandmark(level, trackTex, 2.4, 0.2);
+
+        const group = new THREE.Group();
+        group.add(craters, tracks);
+        group.userData.keepClear = tracks.userData.keepClear;
+        group.userData.disposables = [...craters.userData.disposables, ...tracks.userData.disposables];
+        return group;
+    },
+
+    // Moon Base second landmark: the aliens' flying saucer, landed on four legs. A little alien
+    // pilot sits under the glass dome, and the lights round the rim chase each other
+    // round. 8.6 across. Solid circle in levels.js.
+    createUfo() {
+        const parts = sceneryCached('ufo', () => {
+            const SILVER = '#b2b8c4', LIGHT = '#cbd0da', DARK = '#7e8592';
+            const hull = [
+                { geo: new THREE.SphereGeometry(1, 28, 10), color: SILVER, pos: [0, 2.5, 0], scale: [4.2, 1.0, 4.2] },
+                { geo: new THREE.CylinderGeometry(4.3, 4.3, 0.28, 28), color: DARK, pos: [0, 2.5, 0] },
+                { geo: new THREE.SphereGeometry(2.4, 20, 6, 0, Math.PI * 2, 0, Math.PI / 2), color: LIGHT, pos: [0, 2.9, 0], scale: [1, 0.35, 1] },
+                // The pilot: a green one-eyed alien, looking out at Sheepy
+                { geo: new THREE.SphereGeometry(0.55, 12, 8), color: '#5cc83a', pos: [0, 3.95, 0] },
+                { geo: new THREE.SphereGeometry(1, 10, 6), color: '#ffffff', pos: [0, 4.02, 0.42], scale: [0.26, 0.27, 0.18] },
+                { geo: new THREE.SphereGeometry(1, 8, 6), color: '#1a1420', pos: [0, 4.0, 0.57], scale: [0.12, 0.13, 0.06] }
+            ];
+            // Four legs, leaning in at the top, with round feet
+            for (let k = 0; k < 4; k++) {
+                const a = Math.PI / 4 + k * Math.PI / 2, s = Math.sin(a), c = Math.cos(a);
+                hull.push({ geo: new THREE.CylinderGeometry(0.1, 0.12, 2.2, 6), color: DARK, pos: [s * 3.0, 1.0, c * 3.0], rot: [-c * 0.45, 0, s * 0.45] });
+                hull.push({ geo: new THREE.CylinderGeometry(0.4, 0.45, 0.15, 8), color: DARK, pos: [s * 3.5, 0.08, c * 3.5] });
+            }
+            const LIGHTS = ['#fff27a', '#7affea', '#a8ff6a'];
+            const lights = [];
+            for (let k = 0; k < 12; k++) {
+                const a = (k / 12) * Math.PI * 2;
+                lights.push({ geo: new THREE.SphereGeometry(0.17, 6, 4), color: LIGHTS[k % 3], pos: [Math.sin(a) * 4.33, 2.5, Math.cos(a) * 4.33] });
+            }
+            return {
+                hull: mergePieces(hull),
+                lights: mergePieces(lights),
+                dome: new THREE.SphereGeometry(1.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 3.4, 0)
+            };
+        });
+
+        const group = new THREE.Group();
+        const hull = new THREE.Mesh(parts.hull, candyMaterial()); // smooth and a little shiny, like metal
+        hull.castShadow = true;
+        group.add(hull);
+        const dome = new THREE.Mesh(parts.dome, sceneryCached('ufoGlass', () => new THREE.MeshPhongMaterial({
+            color: 0x9fe6ff, transparent: true, opacity: 0.4, shininess: 100, specular: 0xffffff, emissive: 0x0a3a4a, depthWrite: false
+        })));
+        group.add(dome);
+        const lights = new THREE.Mesh(parts.lights, glowVertexMaterial());
+        group.add(lights);
+        group.userData.update = (dt, t) => { lights.rotation.y = t * 0.8; };
         return group;
     }
 };

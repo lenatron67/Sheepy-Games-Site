@@ -221,6 +221,12 @@
             -webkit-text-stroke: 2px black; text-shadow: 4px 4px 0 #FF69B4, 6px 6px 0 #000;
         }
         #btn-map-back { position: absolute; top: 2.5vmin; left: 2.5vmin; margin: 0; z-index: 4; }
+        /* Phones: held upright there's no room for a centred title beside the Back button, and held
+           sideways the top world's button sits right under it. So it goes in the top-right corner,
+           clear of both (the map path starts lower down). */
+        @media (max-width: 600px), (max-height: 500px) {
+            #world-map-title { left: auto; right: 4vmin; transform: rotate(-2deg); }
+        }
         .world-node {
             position: absolute; transform: translate(-50%, -50%); z-index: 2;
             display: flex; align-items: center; gap: 1.6vmin;
@@ -438,13 +444,13 @@ COMPLETE!</div>
     <script src="js/firebaseManager.js?v=1"></script>
     
     <script src="js/constants.js?v=6"></script>
-    <script src="js/levels.js?v=16"></script>
+    <script src="js/levels.js?v=17"></script>
     <script src="js/progress.js?v=2"></script>
-    <script src="js/assets.js?v=14"></script>
-    <script src="js/scenery.js?v=8"></script>
-    <script src="js/outskirts.js?v=4"></script>
+    <script src="js/assets.js?v=15"></script>
+    <script src="js/scenery.js?v=9"></script>
+    <script src="js/outskirts.js?v=5"></script>
     <script src="js/audio.js?v=8"></script>
     <script src="js/state.js?v=8"></script>
-    <script src="js/main.js?v=20"></script>
+    <script src="js/main.js?v=21"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-const LEVEL_ORDER = ['MAIN', 'BEACH', 'DESERT', 'SNOW', 'JUNGLE', 'SWEETIE', 'VOLCANO', 'CLOUD'];
+const LEVEL_ORDER = ['MAIN', 'BEACH', 'DESERT', 'SNOW', 'JUNGLE', 'SWEETIE', 'VOLCANO', 'CLOUD', 'MOON'];
 
 // Enemy difficulty scaling on top of each world's enemySpeed:
 //   +10% for every lap of all the worlds (lap 2 = +10%, lap 3 = +20%, ...)
@@ -38,6 +38,7 @@ const ENEMY_SCALING = {
 //     wobble  - hops along in squashy bounces, wobbling as it lands (the model needs userData.blob)
 //     storm   - drifts, puffs up with a flicker of lightning (a warning), then dashes (the model
 //               needs userData.cloud and userData.bolt)
+//     moonhop - crouches, then floats along in long low-gravity hops (the model needs userData.alien)
 const LEVELS = {
     MAIN: {
         // Theme metadata
@@ -466,6 +467,63 @@ const LEVELS = {
         music: { // a dreamy, floaty tune in C
             melody: 'C5 E5 G5 C6 B5 G5 E5 - A4 C5 F5 A5 G5 F5 C5 - D5 F5 A5 D6 C6 A5 F5 - G5 - F5 E5 D5 - C5 -',
             bass: ['C3', 'F2', 'D3', 'G2'], tempo: 0.15, wave: 'triangle', gain: 0.1, drums: 'soft'
+        },
+        // World config
+        PINK_COINS_COUNT: 20,
+        GOLD_COINS_COUNT: 10,
+        TREES_COUNT: 55,
+        WORLD_SIZE: 160,
+        SMALL_WORLD_SIZE: 80,
+        GROUND_SIZE: 400, // well past the fence, so the ground fades into the fog instead of ending
+        COIN_SPAWN_HEIGHT: 1,
+        GOLD_COIN_SPAWN_HEIGHT: 6,
+        TREE_EXCLUSION_ZONE: 5
+    },
+
+    MOON: {
+        // Theme metadata
+        biomeName: 'Moon Base',
+        icon: '🌙',
+        mapColor: '#9a9caa',
+        skyColor: 0x161b33, // the dark of space: the far ground fades into it
+        groundType: 'generateMoonTexture',
+        primaryCoinModel: 'createMoonRock',
+        primaryCoinName: 'Moon Rocks',
+        primaryCoinLabel: 'Moon Rocks: ',
+        primaryCoinColor: '#ff3ec8',
+        goldCoinModel: 'createMoonCheese',
+        goldCoinName: 'Moon Cheese',
+        goldCoinColor: '#FFD700',
+        obstacleModel: 'createMoonObstacle',
+        bonusItemModel: 'createShootingStar',
+        hasEnemies: true,
+        enemyModel: 'createMoonAlien',
+        enemyTypes: ['BLINKY', 'BLINKY', 'PINKY', 'PINKY', 'INKY', 'INKY', 'CLYDE', 'CLYDE', 'BLINKY', 'PINKY', 'INKY', 'CLYDE'],
+        // Bright alien colours that stand out on the grey: limes and greens, teals, blues and
+        // oranges (none magenta like the moon rocks, or gold like the cheese)
+        enemyColors: [0x6cd400, 0x58c21a, 0x19c2a8, 0x22b5b0, 0x2a9df4, 0x3f7fe8, 0xff8c1a, 0xf27a00, 0x7be03a, 0x2fd6b8, 0x4aa8ff, 0xffa030],
+        enemySpeed: 7.33,
+        enemyBehaviour: 'moonhop',
+        atmosphere: {
+            ambientColor: 0xd6dcff, ambientIntensity: 0.55,
+            sunColor: 0xffffff, sunIntensity: 1.0,
+            fogNear: 28, fogFar: 72
+        },
+        ambientEffect: { // moon dust twinkling as it floats slowly up in the low gravity
+            count: 140, color: 0xd8e6ff, size: 0.3, opacity: 0.9,
+            heightMin: 0.3, heightMax: 10, velocity: [0.15, 0.35, 0], sway: 0.5, twinkle: true, additive: true
+        },
+        // A rocket on its launch pad on the north edge, with tyre tracks from it, and the aliens'
+        // flying saucer landed on the east edge
+        landmarks: [
+            { model: 'createRocket', x: 0, z: -51, radius: 5.5 },
+            { model: 'createUfo', x: 50, z: 2, radius: 5 }
+        ],
+        groundDetail: 'createMoonCraters',
+        outskirts: 'moon',
+        music: { // a bouncy space tune in E minor, in bleepy arpeggios
+            melody: 'E5 G5 B5 E6 D6 B5 G5 - C5 E5 G5 C6 B5 G5 E5 - A4 C5 E5 A5 G5 E5 C5 - B4 D#5 F#5 B5 A5 F#5 D#5 -',
+            bass: ['E3', 'C3', 'A2', 'B2'], tempo: 0.14, wave: 'sine', gain: 0.13, drums: 'soft'
         },
         // World config
         PINK_COINS_COUNT: 20,

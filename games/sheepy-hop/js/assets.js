@@ -383,6 +383,98 @@ const TextureGenerator = {
         texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.set(25, 25);
         return texture;
+    },
+
+    // Moon Base: grey moon dust in darker and lighter patches, speckled with grit and pocked with
+    // little craters
+    generateMoonTexture() {
+        const size = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#8a8a91';
+        ctx.fillRect(0, 0, size, size);
+
+        // Drawn again a tile over in each direction, so the texture repeats without seams
+        const wrapped = (x, y, r, draw) => {
+            for (const dx of [-size, 0, size]) {
+                for (const dy of [-size, 0, size]) {
+                    if (x + dx + r < 0 || x + dx - r > size || y + dy + r < 0 || y + dy - r > size) continue;
+                    draw(x + dx, y + dy);
+                }
+            }
+        };
+        const patch = (x, y, r, rgb, alpha) => wrapped(x, y, r, (px, py) => {
+            const g = ctx.createRadialGradient(px, py, 0, px, py, r);
+            g.addColorStop(0, `rgba(${rgb}, ${alpha})`);
+            g.addColorStop(1, `rgba(${rgb}, 0)`);
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(px, py, r, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        for (let i = 0; i < 10; i++) patch(Math.random() * size, Math.random() * size, 50 + Math.random() * 90, '96, 96, 106', 0.3);
+        for (let i = 0; i < 12; i++) patch(Math.random() * size, Math.random() * size, 30 + Math.random() * 60, '172, 172, 180', 0.28);
+
+        // Grit
+        for (let i = 0; i < 2600; i++) {
+            ctx.fillStyle = (Math.random() < 0.5 ? 'rgba(60, 60, 68, ' : 'rgba(205, 205, 212, ') + (0.15 + Math.random() * 0.35) + ')';
+            ctx.fillRect(Math.random() * size, Math.random() * size, 1 + Math.random(), 1 + Math.random());
+        }
+
+        // A few faint little craters (few, as the texture repeats every 8 units and too many make
+        // a pattern; the big craters are decals, in scenery.js). On the ground the canvas's top is
+        // north, so the sun (south-east) is down and to the right.
+        ctx.globalAlpha = 0.55;
+        for (let i = 0; i < 4; i++) {
+            const r = 3 + Math.random() * 6;
+            wrapped(Math.random() * size, Math.random() * size, r * 1.5, (px, py) => this.drawMoonCrater(ctx, px, py, r, 0.7, 0.7));
+        }
+        ctx.globalAlpha = 1;
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        return texture;
+    },
+
+    // A crater on a canvas: a soft light rim, brightest on the side facing the sun, round a bowl
+    // whose wall nearest the sun is in shadow. (sx, sy) points towards the sun on the canvas.
+    // Also used for the big crater decals (scenery.js).
+    drawMoonCrater(ctx, x, y, r, sx, sy) {
+        let g = ctx.createRadialGradient(x, y, r * 0.8, x, y, r * 1.45);
+        g.addColorStop(0, 'rgba(196, 196, 204, 0.55)');
+        g.addColorStop(1, 'rgba(196, 196, 204, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 1.45, 0, Math.PI * 2);
+        ctx.fill();
+        const lx = x + sx * r * 0.5, ly = y + sy * r * 0.5;
+        g = ctx.createRadialGradient(lx, ly, r * 0.5, lx, ly, r * 1.1);
+        g.addColorStop(0, 'rgba(228, 228, 234, 0.5)');
+        g.addColorStop(1, 'rgba(228, 228, 234, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 1.45, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillStyle = 'rgba(58, 58, 68, 0.85)'; // the shadow...
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
+        const bx = x - sx * r * 0.3, by = y - sy * r * 0.3; // ...left showing on the sun's side
+        g = ctx.createRadialGradient(bx, by, 0, bx, by, r);
+        g.addColorStop(0, 'rgba(146, 146, 154, 0.95)');
+        g.addColorStop(0.8, 'rgba(118, 118, 127, 0.95)');
+        g.addColorStop(1, 'rgba(150, 150, 158, 0.95)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(bx, by, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 };
 
@@ -690,6 +782,13 @@ const _Mat = {
     fluff:         new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 }),
     stormFace:     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5 }),
     lightning:     new THREE.MeshBasicMaterial({ color: 0xfff27a }), // unlit, so it glows
+    // Moon Base
+    moonRock:      new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.35, metalness: 0.15, emissive: 0x3a0032 }),
+    moonCheese:    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.3, emissive: 0x3a2800 }),
+    shootingStar:  new THREE.MeshStandardMaterial({ color: 0xfff6b0, roughness: 0.3, emissive: 0xffc61a, emissiveIntensity: 0.75 }),
+    // The shooting star's tail: added on top of what's behind it, so its darker end fades away
+    starTail:      new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+    alienFace:     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4 }),
 };
 
 // 3D Model creation functions
@@ -1904,6 +2003,236 @@ const ModelCreator = {
             cloud,
             cloudBaseY: BASE_Y,
             bolt
+        };
+        return group;
+    },
+
+    // ---------- Moon Base ----------
+    // Uses lumpyRockGeo and mergePieces from scenery.js.
+
+    // Moon rock: a knobbly magenta lump with a few glittering crystals poking out, in three shapes
+    createMoonRock() {
+        const variants = sceneryCached('moonRocks', () => [0, 1, 2].map(k => {
+            const pieces = [{ geo: lumpyRockGeo(0.6, 1, 0.12), color: '#d81b9a', scale: [1, 0.82, 0.95] }];
+            const CRYSTAL = new THREE.OctahedronGeometry(1, 0);
+            [[0.9, 0.5], [2.6, 0.9], [4.4, 0.2]].forEach(([a, up], i) => {
+                const turn = a + k * 1.3;
+                pieces.push({
+                    geo: CRYSTAL, color: i === 1 ? '#ffa8ec' : '#ff5fd2',
+                    pos: [Math.sin(turn) * 0.4, 0.15 + up * 0.25, Math.cos(turn) * 0.4],
+                    rot: [Math.cos(turn) * 0.6, 0, -Math.sin(turn) * 0.6], // leaning outwards
+                    scale: [0.1, 0.3, 0.1]
+                });
+            });
+            return mergePieces(pieces);
+        }));
+        const rock = new THREE.Mesh(variants[Math.floor(Math.random() * variants.length)], _Mat.moonRock);
+        rock.castShadow = true;
+        return rock;
+    },
+
+    // Gold moon cheese: a wedge with holes in it, lying flat, its rind a deeper gold. Spins round
+    // its middle.
+    createMoonCheese() {
+        const geo = sceneryCached('moonCheese', () => {
+            const R = 1.05, H = 0.55, A = 0.95; // radius, thickness, and angle of the wedge
+            const shape = new THREE.Shape();
+            shape.moveTo(0, 0);
+            shape.lineTo(R, 0);
+            shape.absarc(0, 0, R, 0, A, false);
+            shape.lineTo(0, 0);
+            const wedge = new THREE.ExtrudeGeometry(shape, { depth: H, bevelEnabled: false, curveSegments: 8 });
+            wedge.rotateX(-Math.PI / 2); // lying flat: the shape's y becomes -z, its depth goes up
+            // The rind (the curved side, facing out from the wedge's point) is a deeper gold
+            const pos = wedge.attributes.position, nor = wedge.attributes.normal, colours = [];
+            const CHEESE = new THREE.Color('#ffd23a'), RIND = new THREE.Color('#f0a91c');
+            for (let i = 0; i < pos.count; i++) {
+                const px = pos.getX(i), pz = pos.getZ(i), d = Math.hypot(px, pz) || 1;
+                const c = (nor.getX(i) * px + nor.getZ(i) * pz) / d > 0.8 ? RIND : CHEESE;
+                colours.push(c.r, c.g, c.b);
+            }
+            wedge.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+
+            const HOLE = '#d39a12', DISC = new THREE.CircleGeometry(1, 12);
+            const pieces = [{ geo: wedge }];
+            // Holes on the top, at [distance from the point, share of the angle, size]...
+            [[0.55, 0.3, 0.1], [0.82, 0.7, 0.12], [0.33, 0.68, 0.07]].forEach(([r, a, s]) => pieces.push({
+                geo: DISC, color: HOLE, pos: [Math.cos(a * A) * r, H + 0.005, -Math.sin(a * A) * r], rot: [-Math.PI / 2, 0, 0], scale: [s, s, s]
+            }));
+            // ...and on the two cut sides, at [distance from the point, height, size]
+            [[0.45, 0.25, 0.09], [0.82, 0.33, 0.07]].forEach(([r, y, s]) => pieces.push({
+                geo: DISC, color: HOLE, pos: [r, y, 0.005], scale: [s, s, s]
+            }));
+            [[0.6, 0.3, 0.1], [0.28, 0.2, 0.06]].forEach(([r, y, s]) => pieces.push({
+                geo: DISC, color: HOLE, pos: [Math.cos(A) * r - Math.sin(A) * 0.005, y, -Math.sin(A) * r - Math.cos(A) * 0.005],
+                rot: [0, A + Math.PI, 0], scale: [s, s, s]
+            }));
+            const g = mergePieces(pieces);
+            // Centred on the middle of the wedge, so it spins in place
+            const mid = 4 * R * Math.sin(A / 2) / (3 * A);
+            g.translate(-Math.cos(A / 2) * mid, -H / 2, Math.sin(A / 2) * mid);
+            return g;
+        });
+        const cheese = new THREE.Mesh(geo, _Mat.moonCheese);
+        cheese.castShadow = true;
+        return cheese;
+    },
+
+    // Shooting star bonus item: a glowing star with a tail streaming up behind it as it falls.
+    // While it falls, main.js calls userData.spin instead of tumbling it, so the tail stays
+    // pointing up; the tail shrinks away as the star comes down to land. Two draw calls.
+    createShootingStar() {
+        const tailGeo = sceneryCached('starTail', () => {
+            // Tapering streaks, bright at the star and fading to nothing at the top (the tail's
+            // material adds its colour to the scene, so black is see-through)
+            const streak = (radius, length, colour) => {
+                const g = new THREE.ConeGeometry(radius, length, 8, 4, true);
+                g.translate(0, length / 2, 0);
+                const p = g.attributes.position, c = new THREE.Color(colour), out = [];
+                for (let i = 0; i < p.count; i++) {
+                    const fade = Math.pow(1 - p.getY(i) / length, 1.5);
+                    out.push(c.r * fade, c.g * fade, c.b * fade);
+                }
+                g.setAttribute('color', new THREE.Float32BufferAttribute(out, 3));
+                return g;
+            };
+            return mergePieces([
+                { geo: streak(0.5, 3.2, '#ffe27a') },
+                { geo: streak(0.22, 2.4, '#ffffff'), pos: [0.25, 0.1, 0.1], rot: [0, 0, -0.12] },
+                { geo: streak(0.18, 2.0, '#9fd8ff'), pos: [-0.3, 0, -0.05], rot: [0, 0, 0.15] }
+            ]);
+        });
+        const group = new THREE.Group();
+        const tilt = new THREE.Group();
+        tilt.rotation.x = -0.6; // facing up a little, towards the camera
+        group.add(tilt);
+        const star = new THREE.Mesh(_Geo.skyStar, _Mat.shootingStar);
+        star.castShadow = true;
+        tilt.add(star);
+        const tail = new THREE.Mesh(tailGeo, _Mat.starTail);
+        group.add(tail);
+        group.userData.spin = frameScale => {
+            star.rotation.z += 0.1 * frameScale;
+            const above = group.position.y - LEVELS.BONUS.RASPBERRY_FINAL_HEIGHT;
+            tail.scale.y = Math.min(1, above / 8);
+            tail.visible = above > 0.05;
+        };
+        return group;
+    },
+
+    // Moon Base obstacle: a grey boulder, a tall rock, a pile of rocks, a radar dish, a radio mast
+    // or a stack of supply crates. Each is one merged mesh (one draw call) within the usual 1.5
+    // collision radius.
+    createMoonObstacle() {
+        const variants = sceneryCached('moonObstacles', () => {
+            const ROCK = ['#7c7c84', '#6c6c74', '#888890'];
+            const WHITE = '#eceef2', STEEL = '#a4a9b3', ORANGE = '#ff8a1f';
+            const B = new THREE.BoxGeometry(1, 1, 1);
+            // Big rocks are rounder (more points), small ones rougher and cheaper
+            const rock = (detail, p, s, k = 0) => ({ geo: lumpyRockGeo(1, detail, 0.14), color: ROCK[k % ROCK.length], pos: p, scale: s });
+            const boulder = () => mergePieces([
+                rock(1, [0, 0.75, 0], [1.3, 0.95, 1.15]),
+                rock(0, [0.95, 0.25, 0.5], [0.45, 0.35, 0.4], 1),
+                rock(0, [-0.8, 0.2, -0.65], [0.35, 0.3, 0.35], 2)
+            ]);
+            const spire = () => mergePieces([
+                rock(1, [0, 1.5, 0], [0.8, 1.8, 0.75], 1),
+                rock(0, [0.2, 3.1, 0.05], [0.45, 0.7, 0.45], 2),
+                rock(0, [0.75, 0.3, 0.4], [0.5, 0.4, 0.45])
+            ]);
+            const pile = () => mergePieces([
+                rock(0, [-0.5, 0.45, 0.2], [0.75, 0.6, 0.7]),
+                rock(0, [0.55, 0.4, -0.25], [0.7, 0.55, 0.65], 1),
+                rock(0, [0.05, 0.95, -0.05], [0.55, 0.5, 0.55], 2),
+                rock(0, [0.3, 0.2, 0.75], [0.35, 0.3, 0.3])
+            ]);
+            // A radar dish on a stand, tipped up towards the sky
+            const dish = () => mergePieces([
+                { geo: B, color: STEEL, pos: [0, 0.25, 0], scale: [1.3, 0.5, 1.3] },
+                { geo: new THREE.CylinderGeometry(0.14, 0.18, 1.8, 6), color: STEEL, pos: [0, 1.4, 0] },
+                { geo: new THREE.CylinderGeometry(1.25, 0.3, 0.4, 14), color: WHITE, pos: [0, 2.55, 0.15], rot: [0.7, 0, 0] },
+                { geo: new THREE.CylinderGeometry(0.04, 0.04, 1.1, 4), color: STEEL, pos: [0, 3.05, 0.5], rot: [0.7, 0, 0] },
+                { geo: new THREE.SphereGeometry(0.12, 6, 4), color: '#e53935', pos: [0, 3.45, 0.85] }
+            ]);
+            // A radio mast with crossbars and a red light on top
+            const mast = () => {
+                const pieces = [
+                    { geo: B, color: STEEL, pos: [0, 0.2, 0], scale: [1.0, 0.4, 1.0] },
+                    { geo: new THREE.CylinderGeometry(0.09, 0.12, 5.2, 5), color: STEEL, pos: [0, 2.9, 0] },
+                    { geo: new THREE.SphereGeometry(0.18, 6, 4), color: '#e53935', pos: [0, 5.6, 0] },
+                    { geo: B, color: '#2c4f9e', pos: [0.6, 1.4, 0], scale: [0.9, 0.06, 0.6], rot: [0, 0, -0.5] } // a little solar panel
+                ];
+                [2.6, 3.6, 4.5].forEach((y, i) => pieces.push({ geo: B, color: STEEL, pos: [0, y, 0], scale: [1.3 - i * 0.3, 0.06, 0.06] }));
+                return mergePieces(pieces);
+            };
+            // Supply crates, white with orange stripes
+            const crates = () => {
+                const pieces = [];
+                [[-0.55, 0.5, 0.2, 1.0, 0.2], [0.6, 0.45, -0.3, 0.9, -0.3], [0, 1.4, -0.05, 0.85, 0.5]].forEach(([x, y, z, s, turn]) => {
+                    pieces.push({ geo: B, color: WHITE, pos: [x, y, z], scale: [s, s, s], rot: [0, turn, 0] });
+                    pieces.push({ geo: B, color: ORANGE, pos: [x, y, z], scale: [s * 1.02, s * 0.16, s * 1.02], rot: [0, turn, 0] });
+                });
+                return mergePieces(pieces);
+            };
+            return [boulder(), boulder(), spire(), pile(), pile(), dish(), mast(), crates()];
+        });
+        const mesh = new THREE.Mesh(variants[Math.floor(Math.random() * variants.length)], vertexColourMaterial());
+        mesh.castShadow = true;
+        mesh.rotation.y = Math.random() * Math.PI * 2;
+        const group = new THREE.Group();
+        group.add(mesh);
+        return group;
+    },
+
+    // Moon alien enemy, facing +z: a round, one-eyed alien with two bobbly antennae and little
+    // feet. It bounces along in long, floaty low-gravity hops (see 'moonhop' in main.js). It's all
+    // in an inner group (userData.alien) so the hop can lift, tip and squash it without moving the
+    // enemy itself, whose collision stays the same. The body's colour shows the AI type, and turns
+    // grey when scared. Two draw calls: the body, and the face (shared by every alien).
+    createMoonAlien(colorHex) {
+        const group = new THREE.Group();
+        const alien = new THREE.Group();
+        alien.position.y = -0.5; // enemies are held 0.5 above the ground: this stands the alien on it
+        group.add(alien);
+
+        // Kept low-poly: there are 12 aliens, and each is drawn twice (once for its shadow)
+        const bodyGeo = sceneryCached('alienBody', () => {
+            const BALL = new THREE.SphereGeometry(1, 14, 9), SMALL = new THREE.SphereGeometry(1, 7, 4);
+            const pieces = [{ geo: BALL, color: '#ffffff', pos: [0, 0.95, 0], scale: [0.9, 0.85, 0.9] }];
+            [-1, 1].forEach(s => {
+                pieces.push({ geo: SMALL, color: '#d6d6d6', pos: [s * 0.4, 0.13, 0.15], scale: [0.26, 0.14, 0.34] });      // feet
+                pieces.push({ geo: new THREE.CylinderGeometry(0.04, 0.05, 0.6, 4), color: '#ffffff', pos: [s * 0.32, 2.0, -0.05], rot: [0, 0, -s * 0.35] }); // antennae
+            });
+            // Spots a shade darker on the back and sides
+            [[0.55, 1.25, -0.5, 0.16], [-0.6, 0.85, -0.45, 0.13], [0.15, 1.45, -0.7, 0.11], [-0.25, 0.55, -0.8, 0.12]]
+                .forEach(([x, y, z, r]) => pieces.push({ geo: SMALL, color: '#c4c4c4', pos: [x, y, z], scale: [r, r, r * 0.5] }));
+            return mergePieces(pieces);
+        });
+        const body = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({ color: colorHex, vertexColors: true, roughness: 0.45 }));
+        body.castShadow = true;
+        alien.add(body);
+
+        const faceGeo = sceneryCached('alienFace', () => {
+            const BALL = new THREE.SphereGeometry(1, 12, 8), SMALL = new THREE.SphereGeometry(1, 6, 4);
+            const pieces = [
+                { geo: BALL, color: '#ffffff', pos: [0, 1.12, 0.66], scale: [0.4, 0.42, 0.3] },   // the one big eye
+                { geo: BALL, color: '#1a1420', pos: [0, 1.1, 0.92], scale: [0.19, 0.21, 0.08] },
+                { geo: SMALL, color: '#ffffff', pos: [-0.07, 1.19, 0.99], scale: [0.06, 0.06, 0.03] },
+                { geo: new THREE.TorusGeometry(0.16, 0.035, 4, 8, Math.PI), color: '#3a1030', pos: [0, 0.64, 0.84], rot: [0.3, 0, Math.PI] } // smile
+            ];
+            [-1, 1].forEach(s => pieces.push({ geo: SMALL, color: '#fff27a', pos: [s * 0.42, 2.29, -0.05], scale: [0.12, 0.12, 0.12] })); // antenna tips
+            return mergePieces(pieces);
+        });
+        const face = new THREE.Mesh(faceGeo, _Mat.alienFace);
+        alien.add(face);
+
+        group.userData = {
+            originalColor: colorHex,
+            isScared: false,
+            bodyMesh: body,
+            tongueMesh: face,            // shared face material: it stays white either way
+            tongueMeshNormalColor: 0xffffff,
+            alien
         };
         return group;
     }

@@ -49,6 +49,7 @@ const Outskirts = (() => {
             octa: new THREE.OctahedronGeometry(1, 0),           // kite
             dome: new THREE.SphereGeometry(1, 10, 4, 0, TAU, 0, Math.PI / 2), // flat base at y = 0
             donut: new THREE.TorusGeometry(1, 0.45, 8, 16),
+            rim: new THREE.TorusGeometry(1, 0.45, 3, 14),       // low ring: a crater's rim, flattened
             // Low rounded hill: a slice off the top of a sphere, so its edge meets the ground at a
             // gentle slope instead of a wall. Base radius 1 at y = 0, height 1.
             cap: (() => {
@@ -928,10 +929,57 @@ const Outskirts = (() => {
         });
     }
 
+    // Little flying saucers (Moon Base) past the fence. Each hovers a while, bobbing and spinning so
+    // its rim lights chase round, then darts off to another spot on its side and hovers again.
+    function ufos(spec, fence) {
+        const geo = sceneryCached('outskirtsUfo', () => {
+            const m = spec.model();
+            return { body: mergeParts(m.body), glow: mergeParts(m.glow) };
+        });
+        return Array.from({ length: spec.count }, (_, i) => {
+            const side = ['N', 'E', 'W'][i % 3];
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(geo.body, vertexColourMaterial());
+            body.castShadow = true;
+            group.add(body, new THREE.Mesh(geo.glow, glowMaterial()));
+            group.scale.setScalar(rand(0.9, 1.2));
+            // On the north side, only where the camera can see from somewhere in the arena
+            const spot = () => {
+                const s = outsideSpot(side, fence, 6, 24);
+                if (side === 'N') s.x = rand(-fence - 15, fence + 15);
+                return s;
+            };
+            let from = spot(), to = from, t = 1, hover = rand(1, 4);
+            const height = rand(6, 10), phase = rand(0, TAU), spin = rand(1.5, 2.5);
+            group.position.set(from.x, height, from.z);
+            group.userData.update = (dt, time) => {
+                if (hover > 0) {
+                    hover -= dt;
+                    if (hover <= 0) {
+                        from = { x: group.position.x, z: group.position.z };
+                        to = spot();
+                        t = 0;
+                    }
+                } else {
+                    const dist = Math.max(1, Math.hypot(to.x - from.x, to.z - from.z));
+                    t = Math.min(1, t + dt * 16 / dist); // about 16 units a second at full speed
+                    const e = t * t * (3 - 2 * t);       // easing in and out
+                    group.position.x = from.x + (to.x - from.x) * e;
+                    group.position.z = from.z + (to.z - from.z) * e;
+                    if (t >= 1) hover = rand(2, 6);
+                }
+                group.position.y = height + Math.sin(time * 1.6 + phase) * 0.4;
+                group.rotation.y += spin * dt;
+                group.rotation.z = Math.sin(time * 1.1 + phase) * 0.08; // a gentle wobble
+            };
+            return group;
+        });
+    }
+
     const ANIMAL_KINDS = {
         walker: walkers, hopper: hoppers, flock: flocks, roller: rollers, geyser: geysers, smoker: smokers,
         sea: seas, sailboat: sailboats, dolphin: dolphins, buoy: buoys, kite: kites,
-        chocolateRiver: chocolateRivers, floater: floaters, balloon: balloons
+        chocolateRiver: chocolateRivers, floater: floaters, balloon: balloons, ufo: ufos
     };
 
     // ---------- Shared props ----------
@@ -1669,6 +1717,141 @@ const Outskirts = (() => {
         right: [part('box', '#ffffff', [-0.5, 0.05, 0], [0.8, 0.04, 0.42]), part('box', '#eeeeee', [-0.98, 0.05, -0.05], [0.36, 0.035, 0.3])]
     });
 
+    // ---------- Moon Base ----------
+    // Inside the fence the detail is all grey: pebbles, little craters and hoofprints, nothing that
+    // could be taken for a magenta moon rock, a gold cheese or a brightly coloured alien.
+
+    const MOON_ROCK = ['#7c7c84', '#6c6c74', '#88888f'];
+    const BASE_WHITE = '#eceef2', BASE_STEEL = '#9aa0aa', WINDOW = '#9fe0ff';
+
+    // A crater's raised rim (a flattened ring) round a darker hollow
+    const craterRim = r => [
+        part('rim', vary('#8c8c94', 0.03), [0, 0, 0], [r, r, 0.32], [Math.PI / 2, 0, 0]),
+        part('cyl', vary('#66666e', 0.03), [0, 0.01, 0], [r * 0.62, 0.02, r * 0.62])
+    ];
+
+    // A trail of little hoofprints, where an astronaut sheep has been
+    const hoofprints = () => {
+        const parts = [], n = randInt(4, 7), bend = rand(-0.15, 0.15);
+        for (let i = 0; i < n; i++) {
+            const a = i * bend, x = Math.sin(a) * i * 0.55 + (i % 2 ? 0.16 : -0.16), z = i * 0.55;
+            parts.push(part('cyl', '#6a6a72', [x, 0.01, z], [0.1, 0.02, 0.13], [0, a, 0]));
+        }
+        return parts;
+    };
+
+    // A dome to live in, with a tunnel to a smaller dome and an antenna. Its windows glow.
+    const moonBase = () => ({
+        parts: [
+            part('dome', BASE_WHITE, [0, 0, 0], [3.2, 2.6, 3.2]),
+            part('cyl', BASE_STEEL, [0, 0.25, 0], [3.3, 0.5, 3.3]),
+            part('box', BASE_STEEL, [0, 0.8, 3.0], [1.2, 1.6, 1.0]),               // airlock
+            part('cyl', BASE_STEEL, [4.2, 0.6, 0], [0.6, 2.6, 0.6], [0, 0, Math.PI / 2]), // tunnel
+            part('dome', BASE_WHITE, [6.2, 0, 0], [1.8, 1.6, 1.8]),
+            part('cyl', BASE_STEEL, [6.2, 0.2, 0], [1.85, 0.4, 1.85]),
+            part('cyl', BASE_STEEL, [6.2, 2.2, 0], [0.05, 1.6, 0.05]),
+            part('pebble', '#e53935', [6.2, 3.05, 0], 0.13)
+        ],
+        glow: [
+            part('box', WINDOW, [0, 0.9, 3.52], [0.6, 0.9, 0.05]),
+            ...[-0.6, 0.6, 2.6].map(a => part('box', WINDOW, [Math.sin(a) * 2.62, 1.5, Math.cos(a) * 2.62], [0.6, 0.4, 0.1], [0, a, 0])),
+            part('box', WINDOW, [6.2, 0.8, 1.72], [0.45, 0.35, 0.06])
+        ]
+    });
+
+    // A row of solar panels on posts, tipped up towards the sun
+    const solarArray = () => {
+        const parts = [];
+        [-1.3, 1.3].forEach(x => {
+            parts.push(part('cyl', BASE_STEEL, [x, 0.6, 0], [0.08, 1.2, 0.08]));
+            parts.push(part('box', '#c9ccd4', [x, 1.2, 0], [2.5, 0.05, 1.5], [-0.5, 0, 0]));
+            parts.push(part('box', '#2c4f9e', [x, 1.24, 0.02], [2.3, 0.05, 1.3], [-0.5, 0, 0]));
+        });
+        return parts;
+    };
+
+    // A radio mast with a dish part way up and a red light on top
+    const radioMast = () => [
+        part('box', BASE_STEEL, [0, 0.2, 0], [1.0, 0.4, 1.0]),
+        part('cyl', BASE_STEEL, [0, 3, 0], [0.09, 6, 0.09]),
+        part('box', BASE_STEEL, [0, 2.5, 0], [1.3, 0.06, 0.06]),
+        part('box', BASE_STEEL, [0, 3.8, 0], [1.0, 0.06, 0.06]),
+        part('cyl', BASE_WHITE, [0, 4.6, 0.3], [0.75, 0.14, 0.75], [1.0, 0, 0]),
+        part('pebble', '#e53935', [0, 6.1, 0], 0.16)
+    ];
+
+    // A little moon lander on four splayed legs
+    const lander = () => {
+        const parts = [
+            part('box', '#c9ccd4', [0, 1.6, 0], [1.6, 1.0, 1.6], [0, Math.PI / 4, 0]),
+            part('cyl', BASE_WHITE, [0, 2.45, 0], [0.75, 0.7, 0.75]),
+            part('box', WINDOW, [0, 2.55, 0.72], [0.4, 0.28, 0.08]),
+            part('cone', '#5a5e68', [0, 0.85, 0], [0.5, 0.6, 0.5])
+        ];
+        [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([sx, sz]) => {
+            parts.push(part('cyl', BASE_STEEL, [sx * 1.05, 0.8, sz * 1.05], [0.05, 1.7, 0.05], [-sz * 0.45, 0, sx * 0.45]));
+            parts.push(part('cyl', BASE_STEEL, [sx * 1.4, 0.05, sz * 1.4], [0.3, 0.1, 0.3]));
+        });
+        return parts;
+    };
+
+    // Moon buggy, facing +z: six fat wheels, two blue seats and an antenna mast (the "head", which
+    // turns to look about while it's parked)
+    const moonBuggy = () => {
+        const body = [
+            part('box', BASE_WHITE, [0, 0.85, 0], [1.5, 0.35, 2.6]),
+            part('box', BASE_STEEL, [0, 0.62, 0], [1.3, 0.15, 2.3]),
+            part('box', '#2f6fd6', [-0.33, 1.2, 0.15], [0.5, 0.4, 0.5]),
+            part('box', '#2f6fd6', [0.33, 1.2, 0.15], [0.5, 0.4, 0.5]),
+            part('box', BASE_WHITE, [0, 1.18, 1.0], [1.4, 0.3, 0.45]),
+            part('box', '#ff8a1f', [0, 0.92, 1.32], [1.2, 0.12, 0.06])
+        ];
+        [-1, 1].forEach(s => [-0.95, 0, 0.95].forEach(z => {
+            body.push(part('cyl', '#3a3d44', [s * 0.88, 0.42, z], [0.42, 0.3, 0.42], [0, 0, Math.PI / 2]));
+            body.push(part('cyl', BASE_STEEL, [s * 1.04, 0.42, z], [0.2, 0.04, 0.2], [0, 0, Math.PI / 2]));
+        }));
+        const head = [
+            part('cyl', BASE_STEEL, [0, 0.6, 0], [0.05, 1.2, 0.05]),
+            part('cyl', BASE_WHITE, [0, 1.25, 0.05], [0.45, 0.08, 0.45], [0.5, 0, 0]),
+            part('box', '#e53935', [0.22, 0.95, 0], [0.4, 0.25, 0.02])
+        ];
+        return { body, head, neck: [-0.5, 1.0, -0.9] };
+    };
+
+    // A sheep in a spacesuit, facing +z: a white helmet with a dark visor, and an air tank on its
+    // back. It bounds about in long, slow moon hops.
+    const astronautSheep = () => ({ body: [
+        part('ball', '#ffffff', [0, 0.75, 0], [0.5, 0.45, 0.65]),
+        part('ball', '#f2f2f2', [0.2, 0.98, -0.15], 0.32),
+        part('ball', '#ffffff', [-0.2, 1.0, 0.1], 0.32),
+        part('box', '#c9ccd4', [0, 0.98, -0.62], [0.5, 0.5, 0.25]),
+        part('ball', '#ffffff', [0, 1.12, 0.62], 0.36),
+        part('ball', '#2b4a7a', [0, 1.1, 0.85], [0.24, 0.19, 0.14]),
+        part('ball', '#9fd0ff', [-0.08, 1.16, 0.95], [0.06, 0.04, 0.03]),
+        part('box', '#2b2b2b', [-0.34, 1.2, 0.55], [0.14, 0.06, 0.1]),
+        part('box', '#2b2b2b', [0.34, 1.2, 0.55], [0.14, 0.06, 0.1]),
+        ...[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx, sz]) => part('box', '#2b2b2b', [sx * 0.2, 0.22, sz * 0.3], [0.1, 0.44, 0.1]))
+    ]});
+
+    // A small flying saucer: a silver lens with a glass dome, and glowing lights round its rim and
+    // underneath
+    const ufo = () => {
+        const glow = [part('cyl', '#b8ffb0', [0, -0.42, 0], [0.9, 0.05, 0.9])];
+        for (let k = 0; k < 8; k++) {
+            const a = (k / 8) * TAU;
+            glow.push(part('pebble', ['#fff27a', '#7affea', '#a8ff6a'][k % 3], [Math.sin(a) * 2.05, 0, Math.cos(a) * 2.05], 0.16));
+        }
+        return {
+            body: [
+                part('ball', '#c3c8d2', [0, 0, 0], [2.0, 0.45, 2.0]),
+                part('cyl', '#7e8592', [0, 0, 0], [2.03, 0.12, 2.03]),
+                part('dome', '#dde1e8', [0, 0.2, 0], [1.2, 0.45, 1.2]),
+                part('dome', '#8fdcff', [0, 0.55, 0], [0.7, 0.6, 0.7])
+            ],
+            glow
+        };
+    };
+
     // ---------- The sets, named by `outskirts` in levels.js ----------
     // Backdrop distances are past the fence. The camera sees about 30-50 units past the east and
     // west fences, and 25-40 past the north one (fog hides the rest), so that's where things go.
@@ -1836,6 +2019,28 @@ const Outskirts = (() => {
                 { count: 45, prop: () => flowers(SKY_FLOWERS) },
                 { count: 30, prop: () => pebbles(MARBLE) },
                 { count: 20, prop: feather }
+            ]
+        },
+
+        moon: {
+            animals: [
+                { kind: 'walker', name: 'moonBuggy', model: moonBuggy, sides: ['N', 'E', 'W'], speed: 2.0, stride: 3.5, bob: 0.05, graze: 0, look: 0.9, scale: 1.2 },
+                { kind: 'hopper', name: 'astronautSheep', model: astronautSheep, sides: ['N', 'E', 'W', 'W'], hop: 2.2, hopHeight: 1.4, hopTime: 1.1, scale: 1.3 },
+                { kind: 'ufo', model: ufo, count: 4 }
+            ],
+            backdrop: [
+                { count: 3, near: 10, far: 16, prop: moonBase, turn: [-0.4, 0.4], clear: 7 },
+                { near: 2, far: 12, per100: 14, prop: () => pick([() => rockPile(MOON_ROCK, 0.8), () => pebbles(MOON_ROCK, 0.45), () => craterRim(rand(0.8, 1.5))])() },
+                { near: 8, far: 30, per100: 5, prop: () => pick([solarArray, solarArray, radioMast, lander])(), clear: 2 },
+                { near: 10, far: 32, per100: 9, prop: () => rockPile(MOON_ROCK, 1.8), scale: [0.9, 1.4] },
+                { near: 12, far: 40, per100: 6, prop: () => craterRim(rand(3, 6)) },
+                hillLayer('#85858d', [2, 4.5])
+            ],
+            detail: [
+                { count: 50, prop: () => pebbles(MOON_ROCK) },
+                { count: 30, prop: () => craterRim(rand(0.5, 1.0)) },
+                { count: 20, prop: hoofprints },
+                { count: 25, prop: () => rockPile(MOON_ROCK, 0.45) }
             ]
         },
 
