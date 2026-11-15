@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sheepy and the Little Lost Star — Sheepy Games</title>
+  <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="description" content="A cosy choose-your-own-adventure bedtime story. Help Sheepy and his friends get a little lost star home, and find all three endings.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --grass-green: #7CD936;
+      --deep-green: #58B01C;
+      --wool-bg: #FFFDF8;
+      --sunny-yellow: #FFDF00;
+      --bright-orange: #FF8811;
+      --night-blue: #3B3F8F;
+      --text-color: #2D3142;
+      --shadow-color: rgba(45, 49, 66, 0.15);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Fredoka', sans-serif; }
+
+    body {
+      background: linear-gradient(180deg, #E3E5FF 0%, var(--wool-bg) 45%);
+      color: var(--text-color);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .story-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.9rem 1.2rem;
+      background: white;
+      box-shadow: 0 4px 15px var(--shadow-color);
+      position: relative;
+      z-index: 10;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--bright-orange);
+      font-weight: 700;
+      font-size: 1.05rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 50px;
+      transition: background-color 0.2s ease;
+    }
+
+    .back-link:hover { background-color: #FFF1E2; }
+
+    .story-title-small {
+      font-weight: 700;
+      font-size: 1rem;
+      opacity: 0.65;
+      text-align: right;
+    }
+
+    main { flex-grow: 1; display: flex; flex-direction: column; }
+
+    /* Cover */
+    .cover {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      padding: 2rem 1.5rem 3rem;
+      text-align: center;
+    }
+
+    .cover-art {
+      width: min(340px, 72vw);
+      height: auto;
+      border-radius: 18px;
+      box-shadow: 0 14px 34px rgba(0,0,0,0.22);
+      animation: coverFloat 4s ease-in-out infinite;
+    }
+
+    /* Shown until images/cover.jpg exists */
+    .cover-placeholder {
+      aspect-ratio: 4 / 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8rem;
+      padding: 1.5rem;
+      color: white;
+      background: radial-gradient(circle at 70% 25%, #6B6FD1 0%, var(--night-blue) 55%, #23264F 100%);
+    }
+
+    .cover-placeholder .big-star { font-size: 4.5rem; }
+    .cover-placeholder strong { font-size: 1.7rem; line-height: 1.2; }
+    .cover-placeholder small { font-size: 1.05rem; opacity: 0.8; }
+
+    @keyframes coverFloat {
+      0%, 100% { transform: translateY(0) rotate(-1deg); }
+      50%      { transform: translateY(-10px) rotate(1deg); }
+    }
+
+    .cover p {
+      font-family: 'Nunito', sans-serif;
+      font-size: 1.05rem;
+      max-width: 34ch;
+      opacity: 0.75;
+    }
+
+    .cover .found-note { font-weight: 800; opacity: 0.9; color: var(--night-blue); }
+
+    .start-btn {
+      background-color: var(--sunny-yellow);
+      color: var(--text-color);
+      font-size: 1.45rem;
+      font-weight: 700;
+      padding: 0.9rem 2.4rem;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #C9AF00, 0 10px 20px rgba(0,0,0,0.15);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .start-btn:hover { transform: translateY(-3px); box-shadow: 0 9px 0 #C9AF00, 0 12px 25px rgba(0,0,0,0.2); }
+    .start-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #C9AF00; }
+
+    /* Reader */
+    .reader {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 1050px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem 1.2rem 1rem;
+    }
+
+    .spread {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 2rem;
+      align-items: center;
+      flex-grow: 1;
+    }
+
+    .page-art {
+      border-radius: 22px;
+      box-shadow: 0 10px 26px var(--shadow-color);
+      background: white;
+      display: block;
+      aspect-ratio: 2 / 3;
+      object-fit: cover;
+      /* Size by width so the whole picture always fits, never cropped */
+      width: min(100%, calc(62vh * 2 / 3));
+      height: auto;
+      margin: 0 auto;
+    }
+
+    /* Shown until the page's picture exists */
+    .art-placeholder {
+      width: min(100%, calc(62vh * 2 / 3));
+      aspect-ratio: 2 / 3;
+      margin: 0 auto;
+      border-radius: 22px;
+      border: 4px dashed #C9CBEF;
+      background: linear-gradient(180deg, #F1F2FF 0%, #FFFFFF 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.7rem;
+      padding: 1.4rem;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .art-placeholder .ph-icon { font-size: 2.6rem; }
+    .art-placeholder .ph-label { font-weight: 700; color: var(--night-blue); font-size: 1.05rem; }
+    .art-placeholder .ph-text { font-family: 'Nunito', sans-serif; font-size: 0.95rem; line-height: 1.5; opacity: 0.75; }
+
+    .page-card {
+      background: white;
+      padding: 1.8rem;
+      border-radius: 22px;
+      box-shadow: 0 10px 26px var(--shadow-color);
+    }
+
+    .page-text {
+      font-family: 'Nunito', sans-serif;
+      font-weight: 700;
+      font-size: clamp(1.1rem, 1rem + 0.7vw, 1.5rem);
+      line-height: 1.65;
+      white-space: pre-line;
+    }
+
+    /* Choice buttons */
+    .choices {
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+      margin-top: 1.4rem;
+    }
+
+    .choice-btn {
+      --btn: var(--sunny-yellow);
+      --btn-edge: #C9AF00;
+      background: var(--btn);
+      color: var(--text-color);
+      border: none;
+      border-radius: 18px;
+      min-height: 3.6rem;
+      padding: 0.8rem 1.2rem;
+      font-size: clamp(1.1rem, 1rem + 0.5vw, 1.3rem);
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+      box-shadow: 0 5px 0 var(--btn-edge);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .choice-btn:nth-child(3n+2) { --btn: #FFB3D1; --btn-edge: #E07FA7; }
+    .choice-btn:nth-child(3n+3) { --btn: #9ED8FF; --btn-edge: #5FAEE0; }
+
+    .choice-btn:hover { transform: translateY(-2px); box-shadow: 0 7px 0 var(--btn-edge); }
+    .choice-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--btn-edge); }
+
+    .art-box, .page-card { transition: opacity 0.25s ease, transform 0.25s ease; }
+
+    .spread.turning .art-box,
+    .spread.turning .page-card { opacity: 0; transform: translateY(8px); }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.2rem;
+      padding: 1.4rem 0 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .nav-btn {
+      background-color: var(--grass-green);
+      color: white;
+      border: none;
+      font-size: 1.15rem;
+      font-weight: 700;
+      padding: 0.85rem 1.8rem;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 5px 0 var(--deep-green);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      min-width: 130px;
+    }
+
+    .nav-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 0 var(--deep-green); }
+    .nav-btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 var(--deep-green); }
+
+    .nav-btn:disabled {
+      background-color: #D8D8D8;
+      box-shadow: 0 5px 0 #BBB;
+      cursor: default;
+      opacity: 0.7;
+    }
+
+    .nav-btn.invisible { visibility: hidden; }
+
+    .dots { display: flex; gap: 7px; align-items: center; }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #E2D9CC;
+      border: none;
+      padding: 0;
+      transition: transform 0.2s ease, background-color 0.2s ease;
+    }
+
+    button.dot { cursor: pointer; background: #C9CBEF; }
+    button.dot:hover { transform: scale(1.3); }
+    .dot.current { background: var(--bright-orange); transform: scale(1.35); }
+
+    .page-count {
+      font-weight: 700;
+      opacity: 0.6;
+      font-size: 0.95rem;
+      width: 100%;
+      text-align: center;
+    }
+
+    /* The End */
+    .ending {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.2rem;
+      text-align: center;
+      padding: 3rem 1.5rem;
+    }
+
+    .ending h2 { font-size: 2.6rem; color: var(--bright-orange); }
+    .ending h3 { font-size: 1.5rem; color: var(--night-blue); }
+    .ending p { font-family: 'Nunito', sans-serif; font-size: 1.1rem; opacity: 0.8; max-width: 36ch; }
+
+    .ending-list {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      justify-content: center;
+      margin: 0.4rem 0;
+    }
+
+    .ending-list li {
+      background: white;
+      border: 3px solid #E7DFD3;
+      border-radius: 50px;
+      padding: 0.5rem 1.1rem;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    .ending-list li.locked { opacity: 0.55; border-style: dashed; }
+    .ending-list li.just-found { border-color: var(--sunny-yellow); background: #FFF9D6; }
+
+    .ending-actions { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; margin-top: 0.4rem; }
+
+    .ghost-btn {
+      background: white;
+      color: var(--text-color);
+      border: 3px solid #E7DFD3;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 0.8rem 1.8rem;
+      border-radius: 50px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.2s ease;
+    }
+
+    .ghost-btn:hover { border-color: var(--bright-orange); color: var(--bright-orange); transform: translateY(-2px); }
+
+    footer {
+      text-align: center;
+      padding: 1.4rem 1rem 2rem;
+      font-family: 'Nunito', sans-serif;
+      font-size: 0.85rem;
+      opacity: 0.55;
+    }
+
+    [hidden] { display: none !important; }
+
+    @media (max-width: 780px) {
+      .spread { grid-template-columns: 1fr; gap: 1.2rem; }
+      .page-art { width: min(100%, calc(42vh * 2 / 3)); }
+      .art-placeholder { width: min(100%, calc(42vh * 2 / 3)); padding: 1rem; }
+      .art-placeholder .ph-icon { font-size: 2rem; }
+      .art-placeholder .ph-text { font-size: 0.85rem; }
+      .page-card { padding: 1.3rem; }
+      .page-text { text-align: center; }
+      .choice-btn { text-align: center; }
+      .nav-btn { min-width: 110px; padding: 0.8rem 1.3rem; }
+      .story-title-small { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="story-header">
+    <a class="back-link" href="../../#games">&#8592; All Games</a>
+    <span class="story-title-small">Sheepy and the Little Lost Star</span>
+  </header>
+
+  <main>
+    <!-- Cover -->
+    <section class="cover" id="cover">
+      <img class="cover-art" id="coverImg" src="images/cover.jpg" width="900" height="1125"
+           alt="Book cover: Sheepy and the Little Lost Star, by Sheepy">
+      <div class="cover-art cover-placeholder" id="coverPlaceholder" hidden>
+        <span class="big-star" aria-hidden="true">&#127775;</span>
+        <strong>Sheepy and the Little Lost Star</strong>
+        <small>by Sheepy</small>
+      </div>
+      <p>A cosy bedtime story where <em>you</em> choose what happens next. Can you find all the endings?</p>
+      <button class="start-btn" id="startBtn" type="button">Read the Story &#128214;</button>
+      <p class="found-note" id="coverFound" hidden></p>
+    </section>
+
+    <!-- Reader -->
+    <section class="reader" id="reader" hidden>
+      <div class="spread" id="spread">
+        <div class="art-box">
+          <img class="page-art" id="pageArt" alt="" width="896" height="1344">
+          <div class="art-placeholder" id="artPlaceholder" hidden>
+            <span class="ph-icon" aria-hidden="true">&#128444;&#65039;</span>
+            <span class="ph-label">Picture coming soon</span>
+            <p class="ph-text" id="phText"></p>
+          </div>
+        </div>
+        <div class="page-card">
+          <p class="page-text" id="pageText"></p>
+          <div class="choices" id="choices" hidden></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="nav-btn" id="prevBtn" type="button">&#8592; Back</button>
+        <div class="dots" id="dots"></div>
+        <button class="nav-btn" id="nextBtn" type="button">Next &#8594;</button>
+        <span class="page-count" id="pageCount"></span>
+      </div>
+    </section>
+
+    <!-- The End -->
+    <section class="ending" id="ending" hidden>
+      <h2>The End &#127775;</h2>
+      <h3 id="endingTitle"></h3>
+      <p id="endingMessage"></p>
+      <p id="endingProgress"></p>
+      <ul class="ending-list" id="endingList"></ul>
+      <div class="ending-actions">
+        <button class="start-btn" id="chooseAgainBtn" type="button">Choose Again &#8617;&#65039;</button>
+        <button class="ghost-btn" id="againBtn" type="button">Start Over &#128257;</button>
+        <a class="ghost-btn" href="../../#games">More Sheepy Fun</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>&#128017; Sheepy Games &mdash; Ad-Free &amp; Pure Fun!</footer>
+
+  <!-- The story text and choices live in story.js -->
+  <script src="story.js"></script>
+  <script>
+    (function () {
+      var START = 'start';
+      var STORAGE_KEY = 'sheepy-lost-star-endings';
+
+      var cover = document.getElementById('cover');
+      var coverImg = document.getElementById('coverImg');
+      var coverPlaceholder = document.getElementById('coverPlaceholder');
+      var coverFound = document.getElementById('coverFound');
+      var reader = document.getElementById('reader');
+      var ending = document.getElementById('ending');
+      var spread = document.getElementById('spread');
+      var art = document.getElementById('pageArt');
+      var artPlaceholder = document.getElementById('artPlaceholder');
+      var phText = document.getElementById('phText');
+      var text = document.getElementById('pageText');
+      var choicesBox = document.getElementById('choices');
+      var prevBtn = document.getElementById('prevBtn');
+      var nextBtn = document.getElementById('nextBtn');
+      var dotsBox = document.getElementById('dots');
+      var pageCount = document.getElementById('pageCount');
+
+      var trail = [];       // pages read so far; the last one is the current page
+      var turnTimer = null;
+
+      function current() { return STORY[trail[trail.length - 1]]; }
+
+      function nextPagesOf(page) {
+        if (page.choices) { return page.choices.map(function (c) { return c.to; }); }
+        return page.next ? [page.next] : [];
+      }
+
+      function picture(id) { return 'images/' + id + '.jpg'; }
+
+      // ---- Check the story for typos (look in the browser console) ----
+      Object.keys(STORY).forEach(function (id) {
+        var page = STORY[id];
+        nextPagesOf(page).forEach(function (to) {
+          if (!STORY[to]) { console.warn('Story: page "' + id + '" goes to "' + to + '", but there is no page called that.'); }
+        });
+        if (page.ending && !ENDINGS[page.ending]) {
+          console.warn('Story: page "' + id + '" ends with "' + page.ending + '", but that is not in ENDINGS.');
+        }
+        if (!page.next && !page.choices && !page.ending) {
+          console.warn('Story: page "' + id + '" has no next, choices or ending.');
+        }
+      });
+
+      // The most pages left from here to an ending, counting this page.
+      var leftMemo = {};
+      function pagesLeft(id, visiting) {
+        if (leftMemo[id] !== undefined) { return leftMemo[id]; }
+        if (!STORY[id]) { return 0; }
+        visiting = visiting || {};
+        if (visiting[id]) { return 0; }
+        visiting[id] = true;
+        var most = 0;
+        nextPagesOf(STORY[id]).forEach(function (to) { most = Math.max(most, pagesLeft(to, visiting)); });
+        delete visiting[id];
+        leftMemo[id] = 1 + most;
+        return leftMemo[id];
+      }
+
+      // ---- Endings found, remembered on this device ----
+      var foundEndings = [];
+      try { foundEndings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch (e) { foundEndings = []; }
+      foundEndings = foundEndings.filter(function (k) { return ENDINGS[k]; });
+
+      function rememberEnding(key) {
+        if (foundEndings.indexOf(key) !== -1) { return false; }
+        foundEndings.push(key);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(foundEndings)); } catch (e) { /* not saved, still fine */ }
+        return true;
+      }
+
+      var endingKeys = Object.keys(ENDINGS);
+
+      function foundSentence() {
+        var n = foundEndings.length, total = endingKeys.length;
+        if (n >= total) { return 'You found all ' + total + ' endings! You\'re a superstar! ⭐'; }
+        return 'You\'ve found ' + n + ' of ' + total + ' endings.';
+      }
+
+      function updateCoverNote() {
+        coverFound.hidden = foundEndings.length === 0;
+        coverFound.textContent = foundSentence();
+      }
+
+      // ---- Pictures (fall back to the description until the file exists) ----
+      art.addEventListener('load', function () {
+        art.hidden = false;
+        artPlaceholder.hidden = true;
+      });
+      art.addEventListener('error', function () {
+        art.hidden = true;
+        artPlaceholder.hidden = false;
+      });
+
+      function showCoverPlaceholder() {
+        coverImg.hidden = true;
+        coverPlaceholder.hidden = false;
+      }
+      coverImg.addEventListener('error', showCoverPlaceholder);
+      if (coverImg.complete && !coverImg.naturalWidth) { showCoverPlaceholder(); }
+
+      function preload(id) {
+        if (STORY[id]) { new Image().src = picture(id); }
+      }
+
+      // ---- Drawing a page ----
+      function render() {
+        var id = trail[trail.length - 1];
+        var page = STORY[id];
+
+        art.alt = page.picture || '';
+        phText.textContent = page.picture || '';
+        art.src = picture(id);
+
+        text.textContent = page.text.trim();
+
+        choicesBox.innerHTML = '';
+        choicesBox.hidden = !page.choices;
+        (page.choices || []).forEach(function (choice) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'choice-btn';
+          b.textContent = choice.label;
+          b.addEventListener('click', function () { goTo(choice.to); });
+          choicesBox.appendChild(b);
+        });
+
+        prevBtn.disabled = trail.length <= 1;
+        nextBtn.classList.toggle('invisible', !!page.choices);
+        nextBtn.disabled = !!page.choices;
+        nextBtn.textContent = page.ending ? 'Finish ✨' : 'Next →';
+
+        // Dots: pages read so far (tap to go back), then the pages still to come.
+        var total = trail.length - 1 + pagesLeft(id);
+        dotsBox.innerHTML = '';
+        for (var i = 0; i < total; i++) {
+          var d;
+          if (i < trail.length) {
+            d = document.createElement('button');
+            d.type = 'button';
+            d.setAttribute('aria-label', 'Go back to page ' + (i + 1));
+            d.addEventListener('click', backTo.bind(null, i));
+          } else {
+            d = document.createElement('span');
+            d.setAttribute('aria-hidden', 'true');
+          }
+          d.className = 'dot' + (i === trail.length - 1 ? ' current' : '');
+          if (i === trail.length - 1) { d.setAttribute('aria-current', 'true'); }
+          dotsBox.appendChild(d);
+        }
+        pageCount.textContent = 'Page ' + trail.length + ' of ' + total;
+
+        nextPagesOf(page).forEach(preload);
+      }
+
+      function turnPage() {
+        clearTimeout(turnTimer);
+        spread.classList.add('turning');
+        turnTimer = setTimeout(function () {
+          render();
+          spread.classList.remove('turning');
+        }, 180);
+      }
+
+      function goTo(id) {
+        if (!STORY[id]) { return; }
+        trail.push(id);
+        turnPage();
+      }
+
+      function backTo(i) {
+        if (i < 0 || i >= trail.length - 1) { return; }
+        trail.length = i + 1;
+        turnPage();
+      }
+
+      function forward() {
+        var page = current();
+        if (page.choices) { return; }
+        if (page.ending) { return finish(page.ending); }
+        goTo(page.next);
+      }
+
+      function back() { backTo(trail.length - 2); }
+
+      function show(section) {
+        [cover, reader, ending].forEach(function (s) { s.hidden = s !== section; });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function start() {
+        trail = [START];
+        render();
+        show(reader);
+      }
+
+      // ---- The End ----
+      function finish(key) {
+        var isNew = rememberEnding(key);
+        document.getElementById('endingTitle').textContent = (isNew ? 'You found a new ending: ' : 'You found the ending: ') + ENDINGS[key].title;
+        document.getElementById('endingMessage').textContent = ENDINGS[key].message;
+        document.getElementById('endingProgress').textContent = foundSentence();
+
+        var list = document.getElementById('endingList');
+        list.innerHTML = '';
+        endingKeys.forEach(function (k) {
+          var li = document.createElement('li');
+          var found = foundEndings.indexOf(k) !== -1;
+          li.textContent = found ? '⭐ ' + ENDINGS[k].title : '? ? ?';
+          if (!found) { li.className = 'locked'; li.setAttribute('aria-label', 'An ending not found yet'); }
+          if (k === key) { li.className = 'just-found'; }
+          list.appendChild(li);
+        });
+
+        updateCoverNote();
+        show(ending);
+      }
+
+      // Back to the last page where a choice was made.
+      function chooseAgain() {
+        for (var i = trail.length - 1; i >= 0; i--) {
+          if (STORY[trail[i]].choices) {
+            trail.length = i + 1;
+            render();
+            show(reader);
+            return;
+          }
+        }
+        start();
+      }
+
+      // ---- Buttons, keys and swipes ----
+      document.getElementById('startBtn').addEventListener('click', start);
+      document.getElementById('againBtn').addEventListener('click', start);
+      document.getElementById('chooseAgainBtn').addEventListener('click', chooseAgain);
+      nextBtn.addEventListener('click', forward);
+      prevBtn.addEventListener('click', back);
+
+      document.addEventListener('keydown', function (e) {
+        if (reader.hidden) { return; }
+        if (e.key === 'ArrowRight') { forward(); }
+        if (e.key === 'ArrowLeft') { back(); }
+      });
+
+      var startX = null;
+      spread.addEventListener('touchstart', function (e) {
+        startX = e.changedTouches[0].clientX;
+      }, { passive: true });
+
+      spread.addEventListener('touchend', function (e) {
+        if (startX === null) { return; }
+        var dx = e.changedTouches[0].clientX - startX;
+        if (Math.abs(dx) > 50) { if (dx < 0) { forward(); } else { back(); } }
+        startX = null;
+      }, { passive: true });
+
+      updateCoverNote();
+      preload(START);
+    })();
+  </script>
+
+</body>
+</html>
