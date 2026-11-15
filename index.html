@@ -334,6 +334,9 @@
 
     /* Mobile Adjustments */
     @media (max-width: 600px) {
+      header { padding: 0.8rem 1rem; }
+      .logo { font-size: 1.4rem; gap: 8px; }
+      .logo svg { width: 38px; height: 38px; }
       .hero h1 { font-size: 2.2rem; }
       .hero p { font-size: 1rem; }
       .cta-btn { font-size: 1.2rem; padding: 0.8rem 1.8rem; }
@@ -347,17 +350,46 @@
   <!-- Top Navigation Bar -->
   <header>
     <a href="#" class="logo">
-      <!-- Cute Sheep Face SVG Logo -->
-      <svg width="40" height="40" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="35" fill="#FFFFFF" stroke="#2D3142" stroke-width="4"/>
-        <circle cx="35" cy="35" r="12" fill="#FFFFFF"/>
-        <circle cx="65" cy="35" r="12" fill="#FFFFFF"/>
-        <circle cx="50" cy="30" r="14" fill="#FFFFFF"/>
-        <rect x="38" y="45" width="24" height="28" rx="12" fill="#2D3142"/>
-        <circle cx="43" cy="53" r="2.5" fill="#FFFFFF"/>
-        <circle cx="57" cy="53" r="2.5" fill="#FFFFFF"/>
-        <ellipse cx="25" cy="45" rx="8" ry="5" fill="#FF8811" transform="rotate(-20 25 45)"/>
-        <ellipse cx="75" cy="45" rx="8" ry="5" fill="#FF8811" transform="rotate(20 75 45)"/>
+      <!-- Cuddly Sheepy face logo -->
+      <svg width="44" height="44" viewBox="0 0 100 100" aria-hidden="true">
+        <!-- Fluffy wool: outline layer, then fill layer on top so the bumps merge -->
+        <g fill="#D8C6A8" stroke="#D8C6A8" stroke-width="6">
+          <circle cx="50" cy="52" r="32"/>
+          <circle cx="50" cy="20" r="13"/><circle cx="29" cy="26" r="13"/><circle cx="71" cy="26" r="13"/>
+          <circle cx="19" cy="46" r="12"/><circle cx="81" cy="46" r="12"/>
+          <circle cx="23" cy="67" r="12"/><circle cx="77" cy="67" r="12"/>
+          <circle cx="37" cy="81" r="12"/><circle cx="63" cy="81" r="12"/><circle cx="50" cy="84" r="11"/>
+        </g>
+        <g fill="#FFFAF0">
+          <circle cx="50" cy="52" r="32"/>
+          <circle cx="50" cy="20" r="13"/><circle cx="29" cy="26" r="13"/><circle cx="71" cy="26" r="13"/>
+          <circle cx="19" cy="46" r="12"/><circle cx="81" cy="46" r="12"/>
+          <circle cx="23" cy="67" r="12"/><circle cx="77" cy="67" r="12"/>
+          <circle cx="37" cy="81" r="12"/><circle cx="63" cy="81" r="12"/><circle cx="50" cy="84" r="11"/>
+        </g>
+        <!-- Floppy ears -->
+        <ellipse cx="25" cy="54" rx="12" ry="6.5" fill="#8E919E" transform="rotate(28 25 54)"/>
+        <ellipse cx="75" cy="54" rx="12" ry="6.5" fill="#8E919E" transform="rotate(-28 75 54)"/>
+        <ellipse cx="26" cy="54" rx="7" ry="3" fill="#FFB3C4" transform="rotate(28 26 54)"/>
+        <ellipse cx="74" cy="54" rx="7" ry="3" fill="#FFB3C4" transform="rotate(-28 74 54)"/>
+        <!-- Face -->
+        <ellipse cx="50" cy="60" rx="21.5" ry="22" fill="#8E919E"/>
+        <!-- Wool fringe -->
+        <g fill="#FFFAF0">
+          <circle cx="41" cy="40" r="8"/><circle cx="50" cy="37" r="9"/><circle cx="59" cy="40" r="8"/>
+        </g>
+        <!-- Big shiny eyes -->
+        <circle cx="42" cy="57" r="6.5" fill="#2D3142"/>
+        <circle cx="58" cy="57" r="6.5" fill="#2D3142"/>
+        <circle cx="44" cy="54.8" r="2.3" fill="#FFFFFF"/>
+        <circle cx="60" cy="54.8" r="2.3" fill="#FFFFFF"/>
+        <circle cx="40.3" cy="59" r="1" fill="#FFFFFF"/>
+        <circle cx="56.3" cy="59" r="1" fill="#FFFFFF"/>
+        <!-- Rosy cheeks -->
+        <ellipse cx="36" cy="67" rx="4.5" ry="3" fill="#FF8FA8"/>
+        <ellipse cx="64" cy="67" rx="4.5" ry="3" fill="#FF8FA8"/>
+        <!-- Little smile -->
+        <path d="M45 68 Q47.5 71.5 50 68 Q52.5 71.5 55 68" stroke="#2D3142" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       Sheepy Games
     </a>
